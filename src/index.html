@@ -1,0 +1,4571 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TikTok直播工作台 - 多房间独立直播工作台</title>
+<!-- v1.14.7 字体内置化：移除飞书 CDN 外部字体（离线/新电脑加载失败），改用 Windows/macOS 系统字体栈 -->
+<style>
+/* ===== 设计变量 ===== */
+:root {
+  --bg: #f4f5f9;
+  --surface: #ffffff;
+  --surface-hover: #f8f9fc;
+  --border: #e5e7ef;
+  --border-light: #eef0f6;
+  --text-primary: #1e2030;
+  --text-secondary: #6b7085;
+  --text-tertiary: #9ca1b5;
+  --primary: #6366f1;
+  --primary-hover: #5558e3;
+  --primary-light: #eef0ff;
+  --primary-dark: #4f46e5;
+  --success: #10b981;
+  --success-light: #ecfdf5;
+  --warning: #f59e0b;
+  --warning-light: #fffbeb;
+  --danger: #ef4444;
+  --danger-light: #fef2f2;
+  --info: #3b82f6;
+  --topbar-bg: #16182d;
+  --topbar-text: #e4e6f0;
+  --sidebar-bg: #fafbfe;
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --shadow-sm: 0 1px 2px rgba(22,24,45,0.04);
+  --shadow: 0 2px 8px rgba(22,24,45,0.06);
+  --shadow-lg: 0 8px 30px rgba(22,24,45,0.12);
+  --font: 'Microsoft YaHei', 'PingFang SC', 'Segoe UI', -apple-system, sans-serif;
+  --mono: 'Consolas', 'JetBrains Mono', 'Courier New', monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.5;
+  min-width: 1200px;
+  overflow-x: auto;
+}
+button { font-family: inherit; cursor: pointer; border: none; background: none; }
+input, select, textarea { font-family: inherit; font-size: 14px; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1d5e0; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #b0b5c5; }
+
+/* ===== 顶栏 ===== */
+.topbar {
+  height: 60px;
+  background: var(--topbar-bg);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.logo-wrap { display: flex; align-items: center; gap: 12px; }
+.logo-icon {
+  width: 38px; height: 38px;
+  background: linear-gradient(135deg, #25F4EE 0%, #FE2C55 100%);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 900; font-size: 18px; color: #fff;
+  letter-spacing: -1px;
+}
+.logo-text { display: flex; flex-direction: column; }
+.logo-title { color: #fff; font-size: 18px; font-weight: 700; letter-spacing: 0.5px; }
+.logo-sub { color: var(--text-tertiary); font-size: 11px; margin-top: 1px; }
+.topbar-spacer { flex: 1; }
+.topbar-btn {
+  height: 36px; padding: 0 16px;
+  border-radius: 8px;
+  color: var(--topbar-text);
+  font-size: 13px; font-weight: 500;
+  display: flex; align-items: center; gap: 6px;
+  transition: all 0.15s;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+.topbar-btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2); }
+.topbar-btn.primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.topbar-btn.primary:hover { background: var(--primary-hover); }
+.topbar-btn .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--success);
+}
+
+/* ===== 主布局 ===== */
+.layout { display: flex; min-height: calc(100vh - 60px); }
+.sidebar {
+  width: 220px;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border-light);
+  padding: 16px 0;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 20px;
+  color: var(--text-secondary);
+  font-size: 14px; font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  border-left: 3px solid transparent;
+  position: relative;
+}
+.nav-item:hover { background: var(--surface-hover); color: var(--text-primary); }
+.nav-item.active {
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  border-left-color: var(--primary);
+  font-weight: 600;
+}
+.nav-item .badge {
+  margin-left: auto;
+  background: var(--primary);
+  color: #fff;
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+.nav-item .icon { width: 18px; height: 18px; flex-shrink: 0; }
+
+.sidebar-divider { height: 1px; background: var(--border-light); margin: 12px 16px; }
+
+.overview-panel { padding: 0 16px; flex: 1; }
+.overview-title {
+  font-size: 12px; font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.overview-title .link { color: var(--primary); cursor: pointer; font-size: 11px; text-transform: none; }
+.overview-card {
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 10px;
+}
+.overview-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 6px 0;
+}
+.overview-row + .overview-row { border-top: 1px solid var(--border-light); }
+.overview-label { font-size: 12px; color: var(--text-secondary); }
+.overview-value { font-size: 18px; font-weight: 700; color: var(--text-primary); }
+.overview-value .unit { font-size: 12px; font-weight: 400; color: var(--text-tertiary); margin-left: 2px; }
+.overview-sub { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+.overview-alert {
+  background: var(--warning-light);
+  border: 1px solid #fde68a;
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: #92400e;
+  line-height: 1.6;
+}
+.overview-alert .dot {
+  display: inline-block; width: 8px; height: 8px;
+  background: var(--warning); border-radius: 50%;
+  margin-right: 6px;
+}
+
+/* ===== 主内容区 ===== */
+.main { flex: 1; padding: 20px 24px; min-width: 0; }
+.page-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 18px;
+}
+.page-title { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+.page-subtitle { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
+
+/* ===== 账号卡片 ===== */
+.account-grid { display: flex; flex-direction: column; gap: 12px; }
+/* v1.10.0 卡片紧凑化：缩小间距与内边距，美观简约 */
+.account-card {
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s;
+}
+.account-card:hover { box-shadow: var(--shadow); }
+
+.metrics-bar {
+  display: flex;
+  padding: 10px 18px 8px;
+  gap: 10px;
+  border-bottom: 1px solid var(--border-light);
+}
+.metric {
+  flex: 1;
+  text-align: center;
+  position: relative;
+}
+.metric + .metric::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 10%; bottom: 10%;
+  width: 1px; background: var(--border-light);
+}
+.metric-value {
+  font-size: 26px; font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.metric-label {
+  font-size: 12px; color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.card-actions-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--border-light);
+  flex-wrap: wrap;
+}
+.status-indicator {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 500;
+  color: var(--text-secondary);
+  margin-right: auto;
+}
+.status-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--text-tertiary);
+  flex-shrink: 0;
+}
+.status-dot.live { background: var(--danger); animation: pulse 1.5s infinite; }
+.status-dot.connected { background: var(--success); }
+.status-dot.warning { background: var(--warning); }
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.account-input {
+  width: 200px;
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+  background: var(--surface);
+}
+.account-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+
+.btn {
+  height: 38px; padding: 0 18px;
+  border-radius: 8px;
+  font-size: 13px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-secondary {
+  background: #eef0f9;
+  color: #45496b;
+  border: 1px solid #c9cdE6;
+  box-shadow: 0 1px 2px rgba(15,23,42,0.05);
+}
+.btn-secondary:hover { background: #e4e7f6; border-color: #a9aed6; }
+.btn-success { background: var(--success); color: #fff; }
+.btn-success:hover { background: #059669; }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover { background: #dc2626; }
+.btn-ghost {
+  background: #f6f7fb;
+  color: #565b78;
+  border: 1px solid #d6d9e7;
+  box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+}
+.btn-ghost:hover { background: #eceef8; border-color: #b4b8da; color: #333750; }
+.btn-sm { height: 30px; padding: 0 12px; font-size: 12px; border-radius: 6px; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.status-tag {
+  font-size: 12px; font-weight: 500;
+  padding: 4px 10px; border-radius: 6px;
+  background: var(--surface-hover);
+  color: var(--text-secondary);
+}
+.status-tag.live { background: var(--danger-light); color: var(--danger); }
+.status-tag.success { background: var(--success-light); color: var(--success); }
+.status-tag.warning { background: var(--warning-light); color: #b45309; }
+
+/* v1.13.0 界面优化：操作按钮分组排版，主次分明 */
+.actions-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  width: 100%;
+}
+.actions-row + .actions-row { margin-top: 10px; }
+/* v1.13.6 第二行工具区：组标签/按钮/素材标签/签名徽章统一高度与间距，对齐简约（对标成品控制台） */
+.actions-row-tools { flex-wrap: wrap; gap: 8px; }
+.actions-row-tools .action-group-label {
+  margin: 0 4px 0 14px; line-height: 34px; white-space: nowrap;
+}
+.actions-row-tools .action-group-label:first-child { margin-left: 0; }
+.actions-row-tools .btn {
+  height: 34px; padding: 0 14px; font-size: 12.5px; border-radius: 8px;
+  line-height: 1; white-space: nowrap;
+}
+.actions-row-tools .push-video-tag,
+.actions-row-tools .signer-badge {
+  height: 34px; line-height: 34px; padding: 0 12px;
+  font-size: 11.5px; border-radius: 8px;
+  white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis;
+}
+.action-group-label {
+  font-size: 11px; color: var(--text-tertiary);
+  font-weight: 700; letter-spacing: 0.8px;
+  margin: 0 4px 0 12px; user-select: none;
+}
+.action-group-label:first-child { margin-left: 0; }
+.btn-main {
+  height: 42px; padding: 0 24px;
+  font-size: 14px; font-weight: 700; border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(99,102,241,0.28);
+}
+.btn-main.btn-success { box-shadow: 0 2px 10px rgba(16,185,129,0.28); }
+.btn-main.btn-danger { box-shadow: 0 2px 10px rgba(239,68,68,0.28); }
+.btn-danger-text { color: var(--danger); }
+.btn-danger-text:hover { background: var(--danger-light); color: var(--danger); }
+.engine-select {
+  height: 38px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); color: var(--text-primary);
+  font-size: 12.5px; font-weight: 600; padding: 0 8px; outline: none;
+  cursor: pointer;
+}
+.engine-select:focus { border-color: var(--primary); }
+/* 第一行动作行：主按钮区与状态右对齐 */
+.actions-row-main { align-items: center; }
+.actions-row-main .status-indicator { margin-right: 0; }
+.push-video-tag {
+  font-size: 12px; font-weight: 500; color: var(--text-secondary);
+  background: #f6f7fb; padding: 3px 8px; border-radius: 6px;
+  border: 1px solid #d6d9e7;
+  max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.signer-badge {
+  font-size: 11px; font-weight: 500; color: var(--text-secondary);
+  background: #f6f7fb; padding: 3px 8px; border-radius: 6px;
+  border: 1px solid #d6d9e7;
+}
+
+/* 日志区进度条 */
+.log-progress {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-right: 12px; font-size: 12px; color: var(--success);
+  font-family: var(--mono); white-space: nowrap;
+}
+.pbar {
+  width: 90px; height: 6px; border-radius: 3px;
+  background: rgba(255,255,255,0.1); overflow: hidden; display: inline-block;
+}
+.pbar i {
+  display: block; height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--success), #67e8f9);
+  border-radius: 3px; transition: width 0.4s ease;
+}
+
+.room-badge {
+  font-size: 11px; font-weight: 600;
+  padding: 3px 8px; border-radius: 20px;
+  background: rgba(99,102,241,0.12);
+  color: var(--primary);
+  margin-left: 6px;
+}
+
+/* ===== 推流信息 ===== */
+.stream-info {
+  margin: 0 24px 14px;
+  padding: 14px 18px;
+  background: var(--success-light);
+  border: 1px solid #a7f3d0;
+  border-radius: var(--radius);
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 16px;
+}
+.stream-info-text { flex: 1; min-width: 0; }
+.stream-info-title {
+  font-size: 13px; font-weight: 600;
+  color: #065f46;
+  margin-bottom: 4px;
+}
+.stream-info-meta {
+  font-size: 12px; color: #047857;
+  font-family: var(--mono);
+  word-break: break-all;
+  line-height: 1.6;
+}
+.stream-info-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+/* ===== 实时动态 ===== */
+.feed-section { padding: 0 24px 18px; }
+.feed-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 10px;
+}
+.feed-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.feed-actions { display: flex; gap: 8px; }
+.feed-box {
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  height: 200px;
+  overflow-y: auto;
+  padding: 12px 16px;
+}
+.feed-empty {
+  height: 100%;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  color: var(--text-tertiary);
+  gap: 6px;
+}
+.feed-empty .main { font-size: 15px; font-weight: 500; }
+.feed-empty .sub { font-size: 12px; }
+.feed-item {
+  padding: 6px 0;
+  font-size: 13px;
+  display: flex; gap: 8px;
+  align-items: flex-start;
+  animation: fadeIn 0.3s;
+}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+.feed-type {
+  flex-shrink: 0;
+  font-size: 11px; font-weight: 600;
+  padding: 1px 6px; border-radius: 4px;
+  margin-top: 2px;
+}
+.feed-type.comment { background: #e0e7ff; color: #4338ca; }
+.feed-type.enter { background: #dbeafe; color: #1d4ed8; }
+.feed-type.gift { background: #fce7f3; color: #be185d; }
+.feed-type.like { background: #fee2e2; color: #b91c1c; }
+.feed-type.follow { background: #d1fae5; color: #047857; }
+.feed-type.system { background: #f3f4f6; color: #4b5563; }
+.feed-type.risk { background: #fef3c7; color: #b45309; }
+.feed-type.online { background: #e0f2fe; color: #0369a1; }
+.btn-live { background: var(--success); color: #fff !important; border-color: var(--success) !important; }
+.feed-content { flex: 1; min-width: 0; }
+.feed-user { font-weight: 600; color: var(--primary-dark); }
+.feed-text { color: var(--text-primary); }
+.feed-translate {
+  font-size: 12px; color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+/* ===== 自动互动设置 ===== */
+.auto-interact {
+  padding: 12px 24px;
+  border-top: 1px solid var(--border-light);
+  background: #fafbff;
+}
+.interact-row {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.checkbox-wrap {
+  display: flex; align-items: center; gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.checkbox-wrap input[type="checkbox"] {
+  width: 16px; height: 16px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+.select {
+  height: 34px; padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  background: var(--surface);
+  outline: none;
+  cursor: pointer;
+}
+.select:focus { border-color: var(--primary); }
+.textarea {
+  width: 100%;
+  min-height: 60px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  resize: vertical;
+  outline: none;
+  font-family: inherit;
+  line-height: 1.6;
+}
+.textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+.hint-text { font-size: 11px; color: var(--text-tertiary); margin-top: 4px; line-height: 1.5; }
+
+/* ===== 节点管理页 ===== */
+.node-list { display: flex; flex-direction: column; gap: 12px; }
+.node-card {
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  padding: 18px 22px;
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 20px;
+}
+.node-info { flex: 1; }
+.node-name { font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
+.node-meta { font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; }
+.node-status {
+  font-size: 13px; font-weight: 500;
+  display: flex; align-items: center; gap: 6px;
+  margin-bottom: 6px;
+}
+.node-status.success { color: var(--success); }
+.node-status.error { color: var(--danger); }
+.node-ip { font-size: 12px; color: var(--text-secondary); font-family: var(--mono); margin-bottom: 4px; }
+.node-speed {
+  display: flex; gap: 20px;
+  font-size: 12px; color: var(--text-secondary);
+}
+.node-speed span strong { color: var(--text-primary); font-weight: 600; }
+.node-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+.add-node-form {
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  margin-bottom: 20px;
+}
+.form-group { margin-bottom: 16px; }
+.form-label {
+  display: block;
+  font-size: 13px; font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+.form-input {
+  width: 100%;
+  height: 42px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: all 0.15s;
+}
+.form-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+.form-input::placeholder { color: var(--text-tertiary); }
+.form-desc {
+  font-size: 12px; color: var(--text-secondary);
+  margin-top: 6px; line-height: 1.6;
+}
+.form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+
+/* ===== 节点分配 ===== */
+.assign-list {
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.assign-row {
+  display: flex; align-items: center; gap: 16px;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--border-light);
+}
+.assign-row:last-child { border-bottom: none; }
+.assign-account { flex: 1; min-width: 0; }
+.assign-account .idx { font-size: 11px; color: var(--text-tertiary); margin-bottom: 2px; }
+.assign-account .name { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+.assign-select { width: 240px; }
+
+/* ===== 画面编辑器 ===== */
+.editor-layout { display: flex; height: calc(100vh - 100px); gap: 0; }
+.editor-left {
+  width: 180px;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border-light);
+  padding: 12px 0;
+  flex-shrink: 0;
+}
+.editor-room-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: all 0.15s;
+}
+.editor-room-item.active {
+  background: var(--primary-light);
+  border-left-color: var(--primary);
+}
+.editor-room-item .rname { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.editor-room-item .rstatus { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+
+.editor-center { flex: 1; padding: 20px; overflow-y: auto; min-width: 0; }
+.editor-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 16px;
+}
+.editor-title { font-size: 20px; font-weight: 700; }
+.editor-meta { font-size: 12px; color: var(--text-secondary); margin-top: 2px; font-family: var(--mono); }
+
+.stream-panel {
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+.stream-panel-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px;
+}
+.stream-tabs { display: flex; gap: 16px; }
+.stream-tab {
+  font-size: 14px; font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding-bottom: 4px;
+  border-bottom: 2px solid transparent;
+}
+.stream-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+.stream-stats {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.stream-stat .label { font-size: 11px; color: var(--text-tertiary); margin-bottom: 2px; }
+.stream-stat .value { font-size: 14px; font-weight: 600; color: var(--text-primary); font-family: var(--mono); }
+.stream-stat .value.error { color: var(--danger); }
+
+.canvas-area {
+  display: flex; gap: 32px; justify-content: center;
+  align-items: flex-start;
+  padding: 16px 0;
+}
+.canvas-frame {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 8px;
+}
+.canvas-preview {
+  width: 300px; height: 533px;
+  background: #0f0f1a;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: var(--shadow-lg);
+  cursor: crosshair;
+}
+.canvas-preview canvas {
+  width: 100%; height: 100%;
+  display: block;
+}
+.canvas-preview .placeholder-text {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: rgba(255,255,255,0.5);
+  font-size: 13px;
+  text-align: center;
+  padding: 20px;
+  gap: 10px;
+  pointer-events: none;
+}
+.canvas-preview .placeholder-text .big {
+  font-size: 32px; opacity: 0.4;
+}
+.canvas-preview .upload-hint {
+  position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+  background: rgba(99,102,241,0.9); color: #fff;
+  padding: 6px 14px; border-radius: 20px;
+  font-size: 12px; font-weight: 600;
+  cursor: pointer; pointer-events: auto;
+  white-space: nowrap;
+}
+.canvas-preview .upload-hint:hover { background: var(--primary); }
+.canvas-label { font-size: 11px; color: var(--text-tertiary); font-weight: 500; }
+.canvas-label .fps { color: var(--success); font-family: var(--mono); }
+
+/* 图层选中框 */
+.layer-select-box {
+  position: absolute;
+  border: 2px dashed var(--primary);
+  pointer-events: none;
+  box-sizing: border-box;
+}
+.layer-handle {
+  position: absolute;
+  width: 10px; height: 10px;
+  background: #fff;
+  border: 2px solid var(--primary);
+  border-radius: 2px;
+  pointer-events: auto;
+  cursor: nwse-resize;
+}
+
+.editor-right {
+  width: 320px;
+  background: var(--sidebar-bg);
+  border-left: 1px solid var(--border-light);
+  padding: 16px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+.panel-box {
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+.panel-title {
+  font-size: 13px; font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.layer-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-bottom: 4px;
+  transition: background 0.15s;
+}
+.layer-item:hover { background: var(--surface-hover); }
+.layer-item.active { background: var(--primary-light); }
+.layer-item .lname { flex: 1; font-size: 13px; font-weight: 500; }
+.layer-item .licon { width: 16px; height: 16px; color: var(--text-secondary); }
+
+.prop-row {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 8px; margin-bottom: 8px;
+}
+.prop-row.full { grid-template-columns: 1fr; }
+.prop-label { font-size: 11px; color: var(--text-tertiary); margin-bottom: 3px; }
+.prop-input {
+  width: 100%; height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  outline: none;
+  font-family: var(--mono);
+}
+.prop-input:focus { border-color: var(--primary); }
+
+.volume-slider {
+  width: 100%;
+  accent-color: var(--success);
+  height: 4px;
+}
+
+/* ===== 弹窗 ===== */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(22,24,45,0.5);
+  backdrop-filter: blur(2px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s;
+}
+.modal {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  width: 480px;
+  max-width: 90vw;
+  max-height: 85vh;
+  overflow-y: auto;
+  animation: slideUp 0.25s;
+}
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+.modal-header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border-light);
+  display: flex; justify-content: space-between; align-items: flex-start;
+}
+.modal-title { font-size: 18px; font-weight: 700; }
+.modal-subtitle { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+.modal-close {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-tertiary);
+  font-size: 20px;
+  transition: all 0.15s;
+}
+.modal-close:hover { background: var(--surface-hover); color: var(--text-primary); }
+.modal-body { padding: 20px 24px; }
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-light);
+  display: flex; justify-content: flex-end; gap: 10px;
+}
+
+/* 实时监控弹窗 */
+.monitor-modal { width: 560px; }
+.monitor-metrics {
+  display: flex;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: 16px;
+}
+.monitor-metric { flex: 1; text-align: center; position: relative; }
+.monitor-metric + .monitor-metric::before {
+  content: ''; position: absolute; left: 0; top: 5%; bottom: 5%;
+  width: 1px; background: var(--border-light);
+}
+.monitor-metric .v { font-size: 24px; font-weight: 700; }
+.monitor-metric .l { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+
+.monitor-stream {
+  background: var(--success-light);
+  border: 1px solid #a7f3d0;
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+.monitor-stream .title { font-size: 13px; font-weight: 600; color: #065f46; margin-bottom: 6px; }
+.monitor-stream .code {
+  font-size: 11px; color: #047857;
+  font-family: var(--mono);
+  word-break: break-all; line-height: 1.6;
+}
+
+/* v1.9.1 每房间独立监控弹窗（白底黑字，浅色主题） */
+.mon-panel {
+  position: fixed; width: 400px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(22, 24, 45, 0.18);
+  z-index: 300;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  color: var(--text-primary);
+}
+.mon-panel.minimized .mon-panel-body { display: none; }
+.mon-panel-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 12px;
+  background: var(--surface-hover);
+  border-bottom: 1px solid var(--border-light);
+  cursor: move; user-select: none;
+}
+.mon-panel-title { font-size: 13px; font-weight: 700; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); }
+.mon-panel-title .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--text-tertiary); }
+.mon-panel-title .dot.live { background: #10b981; box-shadow: 0 0 6px #10b98188; }
+.mon-panel-live { font-size: 11px; color: var(--text-secondary); font-weight: 600; margin-right: 2px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.mon-panel-icon {
+  width: 24px; height: 24px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-tertiary); font-size: 14px;
+}
+.mon-panel-icon:hover { background: #e8eaf1; color: var(--text-primary); }
+.mon-panel-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+/* v1.10.0 直播画面小电视（监控窗口直播画面，非网页） */
+.mon-panel-tv {
+  width: 100%; aspect-ratio: 9 / 16; max-height: 300px;
+  background: #0a0a0f; border-radius: 10px; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border-light);
+}
+.mon-panel-tv img { width: 100%; height: 100%; object-fit: contain; }
+.mon-panel-tv .tv-placeholder { color: #8a8a95; font-size: 12px; text-align: center; }
+/* v1.10.0 独立监控窗口（可拖出软件页面外）：全屏面板 + frameless 拖动 */
+body.monitor-mode { margin: 0; padding: 0; overflow: hidden; background: #eef0f5; }
+body.monitor-mode .mon-panel.mon-standalone {
+  position: fixed; inset: 0; width: 100vw; height: 100vh;
+  display: flex; flex-direction: column; border-radius: 0; box-shadow: none; border: none;
+}
+body.monitor-mode .mon-panel-body { flex: 1; overflow-y: auto; }
+body.monitor-mode .mon-panel-header { -webkit-app-region: drag; cursor: move; }
+body.monitor-mode .mon-panel-icon { -webkit-app-region: no-drag; }
+body.monitor-mode .mon-panel-tv { max-height: 42vh; aspect-ratio: 9/16; }
+.mon-panel-metrics { display: flex; }
+.mon-panel-metrics .monitor-metric + .monitor-metric::before { top: 10%; bottom: 10%; }
+.mon-panel-metrics .monitor-metric .v { font-size: 19px; font-weight: 700; color: var(--text-primary); }
+.mon-panel-metrics .monitor-metric .l { color: var(--text-secondary); }
+.mon-panel-feed {
+  height: 190px; overflow-y: auto;
+  background: #f5f6fa;
+  border: 1px solid var(--border-light);
+  border-radius: 8px; padding: 8px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.mon-panel-feed .feed-empty { text-align: center; color: var(--text-tertiary); font-size: 12px; padding: 24px 0; }
+.mon-panel-risk { max-height: 96px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.mon-risk-item {
+  font-size: 12px; line-height: 1.5;
+  border-radius: 6px; padding: 6px 8px;
+  border-left: 3px solid #f59e0b;
+  background: #fffbeb;
+  color: var(--text-secondary);
+}
+.mon-risk-item.high { border-left-color: #ef4444; background: #fef2f2; color: #7f1d1d; }
+.mon-risk-item .t { font-weight: 600; color: #b45309; }
+.mon-risk-item.high .t { color: #b91c1c; }
+.mon-panel-actions { display: flex; gap: 6px; }
+.mon-panel-send { display: flex; gap: 6px; }
+.mon-panel-send input {
+  flex: 1; height: 32px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px; padding: 0 10px;
+  color: var(--text-primary); font-size: 13px;
+  outline: none;
+}
+.mon-panel-send input:focus { border-color: var(--primary, #6366f1); }
+.mon-panel-send input::placeholder { color: var(--text-tertiary); }
+.mon-quick { display: flex; flex-wrap: wrap; gap: 4px; }
+.mon-quick .q {
+  font-size: 11px; padding: 3px 8px; border-radius: 999px;
+  background: var(--primary-light); color: var(--primary-dark);
+  border: 1px solid #d9dbfa;
+  cursor: pointer;
+}
+.mon-quick .q:hover { background: #e3e6ff; }
+.mon-panel-empty-note { font-size: 11px; color: var(--text-tertiary); text-align: center; padding: 6px 0; }
+/* v1.9.1 面板内按钮适配白底 */
+.mon-panel .btn-ghost { color: var(--text-secondary); }
+.mon-panel .btn-ghost:hover { background: #e8eaf1; color: var(--text-primary); }
+
+/* ===== 底部日志 ===== */
+.log-bar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: 32px;
+  background: var(--topbar-bg);
+  border-top: 1px solid rgba(255,255,255,0.08);
+  display: flex; align-items: center;
+  padding: 0 20px;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  z-index: 50;
+  overflow: hidden;
+}
+.log-bar .log-label { color: var(--text-tertiary); font-weight: 500; flex-shrink: 0; }
+.log-bar .log-content {
+  flex: 1; overflow: hidden;
+  white-space: nowrap; text-overflow: ellipsis;
+}
+.log-bar .log-content .time { color: var(--text-tertiary); margin-right: 8px; }
+
+/* ===== 空状态 ===== */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-tertiary);
+}
+.empty-state .icon {
+  width: 64px; height: 64px;
+  margin: 0 auto 16px;
+  background: var(--surface-hover);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+}
+.empty-state .title { font-size: 16px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; }
+.empty-state .desc { font-size: 13px; }
+
+/* ===== Toast ===== */
+.toast-container {
+  position: fixed; top: 76px; right: 24px;
+  z-index: 2000;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.toast {
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  padding: 12px 18px;
+  box-shadow: var(--shadow-lg);
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; font-weight: 500;
+  animation: slideIn 0.25s;
+  min-width: 240px;
+}
+@keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+.toast .ticon { width: 18px; height: 18px; flex-shrink: 0; }
+.toast.success .ticon { color: var(--success); }
+.toast.error .ticon { color: var(--danger); }
+.toast.info .ticon { color: var(--info); }
+
+/* ===== 工具类 ===== */
+.hidden { display: none !important; }
+.flex { display: flex; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-2 { gap: 8px; }
+.gap-3 { gap: 12px; }
+.mt-2 { margin-top: 8px; }
+.mt-3 { margin-top: 12px; }
+.mb-2 { margin-bottom: 8px; }
+.mb-3 { margin-bottom: 12px; }
+.text-sm { font-size: 12px; }
+.text-muted { color: var(--text-secondary); }
+.text-danger { color: var(--danger); }
+.text-success { color: var(--success); }
+.font-mono { font-family: var(--mono); }
+</style>
+</head>
+<body>
+
+<!-- ===== 卡密授权登录遮罩 v1.14.0 ===== -->
+<div id="licenseOverlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; z-index:999999; background:linear-gradient(135deg,#0b1220 0%,#101b2e 100%); align-items:center; justify-content:center; font-family:'Segoe UI','Microsoft YaHei',sans-serif;">
+  <div style="width:420px; max-width:92vw; background:#16223a; border:1px solid #2b3a55; border-radius:16px; padding:36px 34px 30px; box-shadow:0 18px 60px rgba(0,0,0,.55); text-align:center;">
+    <div style="font-size:34px; font-weight:800; color:#4ade80; letter-spacing:2px; margin-bottom:4px;">TikTok 直播工作台</div>
+    <div style="font-size:13px; color:#8fa3c2; margin-bottom:26px;">软件激活 · 卡密验证</div>
+    <div style="text-align:left; font-size:13px; color:#c3d0e5; margin-bottom:8px;">请输入卡密（格式：TK-XXXX-XXXX-XXXX）</div>
+    <input id="licCode" type="text" spellcheck="false" autocomplete="off" style="width:100%; box-sizing:border-box; padding:12px 14px; font-size:16px; letter-spacing:2px; background:#0d1526; color:#e8eef8; border:1px solid #33445f; border-radius:8px; outline:none;" placeholder="TK-XXXX-XXXX-XXXX" />
+    <button id="licBtn" style="width:100%; margin-top:14px; padding:12px 0; font-size:16px; font-weight:700; color:#0b1220; background:linear-gradient(90deg,#4ade80,#22d3ee); border:none; border-radius:8px; cursor:pointer;">激 活</button>
+    <div id="licMsg" style="margin-top:12px; min-height:20px; font-size:13px; color:#f87171;"></div>
+    <div style="margin-top:18px; padding-top:16px; border-top:1px dashed #2b3a55; font-size:12px; color:#6f82a0;">
+      本机机器码：<span id="licMachine" style="font-family:Consolas,monospace; color:#93a7c6; user-select:text;">…</span>
+      <div style="margin-top:6px; color:#5a6d8a;">该卡密绑定当前电脑，复制软件到其他电脑无法使用</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 顶栏 ===== -->
+<header class="topbar">
+  <div class="logo-wrap">
+    <div class="logo-icon">TT</div>
+    <div class="logo-text">
+      <span class="logo-title">TikTok直播工作台</span>
+      <span class="logo-sub" id="appVersionTag">版本加载中...</span>
+    </div>
+  </div>
+  <div class="topbar-spacer"></div>
+  <button class="topbar-btn" onclick="showNodeManager()">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 10v6m11-11h-6M7 12H1m16.24-7.24l-4.24 4.24m-6 6l-4.24 4.24m0-14.48l4.24 4.24m6 6l4.24 4.24"/></svg>
+    节点管理
+  </button>
+  <button class="topbar-btn" id="broadcastBtn" onclick="toggleBroadcast()">
+    <span class="dot" id="broadcastDot"></span>
+    <span id="broadcastText">播报:开</span>
+  </button>
+  <button class="topbar-btn" onclick="showSavedAccounts()">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    使用已保存账号
+  </button>
+  <button class="topbar-btn primary" onclick="showAddAccount()">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    添加账号
+  </button>
+</header>
+
+<!-- ===== 左下角说明书按钮 v1.14.2（上移避开日志区） ===== -->
+<button id="helpBtn" onclick="window.tkAPI &amp;&amp; window.tkAPI.openHelp()" style="position:fixed; left:16px; bottom:64px; z-index:5000; background:#16223a; border:1px solid #2b3a55; color:#93c5fd; border-radius:8px; padding:7px 13px; font-size:12.5px; cursor:pointer; font-family:'Segoe UI','Microsoft YaHei',sans-serif; box-shadow:0 4px 14px rgba(0,0,0,.4); line-height:1;" title="打开使用说明书">📖 说明书</button>
+
+<!-- ===== 主布局 ===== -->
+<div class="layout">
+  <!-- 侧边栏 -->
+  <aside class="sidebar">
+    <div class="nav-item active" data-route="mobile" onclick="navigate('mobile')">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>
+      直播工作台
+      <span class="badge" id="mobileCount">0</span>
+    </div>
+
+    <div class="sidebar-divider"></div>
+
+    <div class="overview-panel">
+      <div class="overview-title">
+        实时总览
+        <span class="link" onclick="refreshOverview()">刷新</span>
+      </div>
+      <div class="overview-card">
+        <div class="overview-row">
+          <span class="overview-label">账号总数</span>
+          <span class="overview-value" id="ovTotal">0<span class="unit">个</span></span>
+        </div>
+        <div class="overview-sub" id="ovSub">当前已添加账号</div>
+      </div>
+      <div class="overview-card">
+        <div class="overview-row">
+          <span class="overview-label">实时监控</span>
+          <span class="overview-value" id="ovMonitor" style="font-size:16px">0 / 0</span>
+        </div>
+        <div class="overview-sub" id="ovMonitorSub">连接中 / 总数</div>
+      </div>
+      <div class="overview-card">
+        <div class="overview-row">
+          <span class="overview-label">内置推流</span>
+          <span class="overview-value" id="ovStream" style="font-size:16px;color:var(--success)">上传中 0</span>
+        </div>
+        <div class="overview-sub" id="ovStreamSub">重连0 · 推流失败0 · 房间异常0</div>
+      </div>
+      <div class="overview-card">
+        <div class="overview-row">
+          <span class="overview-label">画面房间</span>
+          <span class="overview-value" id="ovRooms" style="font-size:16px">已打开 0 个</span>
+        </div>
+        <div class="overview-sub" id="ovRoomsSub">已配置0 · 异常0</div>
+      </div>
+      <div class="overview-alert" id="ovAlert" style="display:none">
+        <span class="dot"></span>
+        <span id="ovAlertText">部分状态需要关注</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 主内容区 -->
+  <main class="main" id="mainContent" style="padding-bottom:50px">
+    <!-- 视图由JS渲染 -->
+  </main>
+</div>
+
+<!-- ===== 底部日志 ===== -->
+<div class="log-bar">
+  <span class="log-label">运行日志</span>
+  <span class="log-progress" id="logProgress" style="display:none">
+    <span id="logProgressText" style="white-space:nowrap"></span>
+    <span class="pbar"><i id="pbarFill"></i></span>
+  </span>
+  <span class="log-content" id="logContent">
+    <span class="time" id="logTime"></span>
+    <span id="logText">系统就绪，等待操作...</span>
+  </span>
+  <span style="flex-shrink:0;margin-left:8px">
+    <button class="btn btn-ghost btn-sm" style="padding:2px 8px" onclick="showAllLogs()" title="查看全部运行日志">查看全部日志</button>
+  </span>
+</div>
+
+<!-- ===== Toast容器 ===== -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ===== 弹窗容器 ===== -->
+<div id="modalContainer"></div>
+
+<!-- v1.9.0 每房间独立监控弹窗容器 -->
+<div id="monitorPanels"></div>
+
+<!-- v1.12.43 手机下播醒目提醒横幅（红底黄字闪烁 + 蜂鸣 + 确认按钮，不抢焦点） -->
+<div id="phoneDownBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:99999;background:#dc2626;color:#fff;font-weight:700;font-size:17px;text-align:center;padding:14px 10px;box-shadow:0 4px 16px rgba(220,38,38,.5);cursor:pointer;animation:phoneDownFlash 1s infinite;">
+  <span id="phoneDownMsg">⚠️ 请手动在手机端下播（单端接管直播）</span>
+  <button onclick="confirmPhoneDown()" style="margin-left:16px;background:#fff;color:#dc2626;border:none;border-radius:6px;padding:8px 18px;font-size:14px;font-weight:700;cursor:pointer;">✅ 我已手动下播</button>
+</div>
+<style>@keyframes phoneDownFlash { 0%,100%{opacity:1} 50%{opacity:.45} }</style>
+
+<script>
+// v1.15.1 修复：isElectron 必须最先定义（此前在 2480 行定义，
+// 而 1240 行 syncNodesFromMainOnBoot IIFE 提前访问 → TDZ ReferenceError → 前端脚本整体中断 → 软件全部功能失效）
+const isElectron = !!(window.tkAPI && window.tkAPI.isElectron && window.tkAPI.isElectron());
+// ============================================================
+// 卡密授权登录遮罩 v1.14.0（本地验证 / 一卡一机 / 永久有效）
+// ============================================================
+(function licenseGate() {
+  const ov = document.getElementById('licenseOverlay');
+  const msg = document.getElementById('licMsg');
+  const input = document.getElementById('licCode');
+  const btn = document.getElementById('licBtn');
+  const mch = document.getElementById('licMachine');
+  if (!ov || !window.tkAPI || !window.tkAPI.licenseCheck) return;
+  window.tkAPI.licenseCheck().then(st => {
+    if (!st || st.ok) return; // 已激活直接放行
+    if (mch) mch.textContent = st.machine || '';
+    ov.style.display = 'flex';
+    if (st.reason === 'machine_mismatch') {
+      msg.style.color = '#f0a64a';
+      msg.textContent = '此副本已绑定其他电脑，请输入有效卡密重新激活';
+    }
+    btn.onclick = () => {
+      const code = (input.value || '').trim();
+      if (!code) { msg.style.color = '#f87171'; msg.textContent = '请输入卡密'; return; }
+      btn.disabled = true; btn.textContent = '验证中…';
+      window.tkAPI.licenseActivate({ code }).then(r => {
+        if (r && r.ok) {
+          msg.style.color = '#4ade80';
+          msg.textContent = '激活成功，正在进入…';
+          setTimeout(() => { ov.style.display = 'none'; }, 700);
+        } else {
+          btn.disabled = false; btn.textContent = '激 活';
+          const txt = r && r.reason === 'format' ? '卡密格式不对（TK-XXXX-XXXX-XXXX）'
+            : r && r.reason === 'invalid' ? '卡密无效，请检查后重新输入'
+            : '激活失败，请重试';
+          msg.style.color = '#f87171';
+          msg.textContent = '❌ ' + txt;
+        }
+      }).catch(() => { btn.disabled = false; btn.textContent = '激 活'; msg.textContent = '❌ 激活失败，请重试'; });
+    };
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') btn.click(); });
+    input.focus();
+  }).catch(() => {});
+})();
+
+// ============================================================
+// 状态管理
+// ============================================================
+const STORAGE_KEY = 'tk_workbench_state_v3';
+const STORAGE_KEY_V2 = 'tk_workbench_state_v2';
+
+const defaultState = {
+  broadcast: true,
+  accounts: [],           // 零预置：房间全部由用户自己添加（一个房间一个号）
+  nodes: [],
+  partnerRooms: [],
+  currentRoute: 'mobile',
+  nextAccountId: 1,
+  nextNodeId: 1,
+  nextLayerId: 1,
+  editorScenes: {},
+};
+
+let state = loadState();
+
+// v1.14.19 节点权威来源修复：localStorage 保存有异步落盘延迟，添加节点后立即重启会丢节点列表；
+// 启动后异步从主进程 nodes.json（代理实际使用的权威数据）补回缺失节点。
+(function syncNodesFromMainOnBoot() {
+  if (!isElectron || !window.tkAPI || !window.tkAPI.getNodes) return;
+  window.tkAPI.getNodes().then(res => {
+    try {
+      if (!res || !Array.isArray(res.nodes) || !res.nodes.length) return;
+      const mainNodes = res.nodes.map(n => ({
+        id: n.id,
+        name: n.name || ('节点' + n.id),
+        type: (n.link || '').startsWith('vless') ? 'vless' : ((n.link || '').startsWith('vmess') ? 'vmess' : 'socks5'),
+        url: n.link,
+        status: 'disconnected',
+        testResult: '',
+        assignedAccounts: 0,
+      }));
+      const existing = new Set(state.nodes.map(n => n.id));
+      let changed = false;
+      mainNodes.forEach(n => { if (!existing.has(n.id)) { state.nodes.push(n); changed = true; } });
+      const maxId = mainNodes.reduce((m, n) => Math.max(m, n.id + 1), 1);
+      if (maxId > state.nextNodeId) { state.nextNodeId = maxId; changed = true; }
+      if (changed) { saveState(); render(); }
+    } catch (e) { console.warn('同步主进程节点失败', e); }
+  }).catch(() => {});
+})();
+
+function loadState() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    const savedV2 = localStorage.getItem(STORAGE_KEY_V2);
+    const parsed = saved ? JSON.parse(saved) : null;
+    const parsedV2 = savedV2 ? JSON.parse(savedV2) : null;
+    const base = mergeState(parsed, parsedV2);
+    // v1.12.9 重启后主进程监控/推流不会自动恢复：重置为未启动状态，避免"监控窗口"假状态导致实时动态无数据
+    (base.accounts || []).forEach(a => { a.monitorRunning = false; a.streaming = false; if (a.status === 'streaming' || a.status === 'live') a.status = 'connected'; });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(base));
+    return base;
+  } catch (e) { console.warn('加载状态失败', e); }
+  return JSON.parse(JSON.stringify(defaultState));
+}
+
+// 合并：只保留用户真正操作过的房间（自建 id>=5、或改过名/已登录/分配过节点/roomName 非默认预置名）；
+// 预置的「房间 1-4」一律丢弃，任何演示都不要。用户自填节点保留但重置假测试状态。
+function mergeState(parsed, parsedV2) {
+  const base = JSON.parse(JSON.stringify(defaultState));
+  const src = parsed || parsedV2;
+  const defaultNames = ['房间 1', '房间 2', '房间 3', '房间 4'];
+
+  if (src && Array.isArray(src.accounts)) {
+    base.accounts = src.accounts.filter(a => a && (
+      a.id >= 5 ||
+      a.name ||
+      a.loggedIn ||
+      a.nodeId ||
+      !defaultNames.includes(a.roomName)
+    ));
+    // v1.9.0 补齐旧账号缺失字段（自动互动配置/风险记录），避免渲染报错
+    base.accounts.forEach(a => {
+      if (!a.autoInteract) a.autoInteract = { enabled: false, lang: '英语(美区)', coldStart: false, welcomeMsg: '欢迎来到直播间。喜欢的朋友可以点个关注。有问题欢迎留言。', replyRules: [] };
+      if (!a.autoInteract.replyRules) a.autoInteract.replyRules = [];
+      if (!a.autoInteract.welcomeMsg) a.autoInteract.welcomeMsg = '欢迎来到直播间。喜欢的朋友可以点个关注。有问题欢迎留言。';
+      if (!a.metrics) a.metrics = { online: 0, likes: 0, gifts: 0, follows: 0, enters: 0, comments: 0 };
+      if (!a.risks) a.risks = [];
+      // v1.13.10 重启强制清空运行时数据残留：feed/风险/统计都是"直播进行时"的数据，跨重启恢复就是假数据（用户要求绝对真实，开播重记、下播清零）
+      a.feed = [];
+      a.risks = [];
+      a.metrics = { online: 0, likes: 0, gifts: 0, follows: 0, enters: 0, comments: 0 };
+      a.liveStartedAt = null;
+      // v1.9.4 重启后强制重置运行态：推流/直播状态是运行时事实，不能从上次残留（避免假"直播中"）
+      a.streaming = false;
+      a.delayed = false; // v1.13.11 自动推流等待态不跨重启
+      a.delayedUntil = null;
+      a.retrying = false; // v1.13.12 duplicate 重试态不跨重启
+      a.status = 'connected';
+    });
+  }
+
+  base.broadcast = src && src.broadcast !== undefined ? src.broadcast : base.broadcast;
+  // 场景图层：仅保留仍在房间列表里的场景；丢弃重启后必然失效的 blob 引用图层（文件无法恢复，避免编辑器残留占位）
+  base.editorScenes = {};
+  const validAccIds = new Set(base.accounts.map(a => a.id));
+  if (src && src.editorScenes) {
+    Object.entries(src.editorScenes).forEach(([accId, s]) => {
+      if (!s || !validAccIds.has(parseInt(accId, 10))) return;
+      const layers = (s.layers || []).filter(l => !(l && typeof l.src === 'string' && l.src.startsWith('blob:')));
+      base.editorScenes[accId] = { ...s, layers, selectedLayerId: layers.some(l => l.id === s.selectedLayerId) ? s.selectedLayerId : null };
+    });
+  }
+
+  // 图层 id 必须保持全局唯一，否则新上传的视频/图片会与旧图层冲突（导致加不进去/选错）
+  let maxLayer = 0;
+  Object.values(base.editorScenes).forEach(s => {
+    (s.layers || []).forEach(l => { if (l.id > maxLayer) maxLayer = l.id; });
+  });
+  base.nextLayerId = maxLayer + 1;
+
+  // 节点：仅迁移用户自填节点（丢弃 v1.1 预置演示「美8/美9/美11/美12」），测试状态一律重置
+  const nodeSrc = parsedV2 || parsed;
+  if (nodeSrc && nodeSrc.nodes && nodeSrc.nodes.length) {
+    const kept = nodeSrc.nodes.filter(n => !/美(8|9|11|12)/.test(n.name || ''));
+    base.nodes = kept.map(n => ({
+      id: n.id, name: n.name, type: n.type, url: n.url,
+      status: 'disconnected', testResult: '', assignedAccounts: 0,
+    }));
+    base.nextNodeId = kept.reduce((m, n) => Math.max(m, n.id + 1), 1);
+  }
+
+  const maxAcc = base.accounts.reduce((m, a) => Math.max(m, a.id + 1), 1);
+  base.nextAccountId = Math.max(maxAcc, (src && src.nextAccountId) || 1);
+  return base;
+}
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (e) { console.warn('保存状态失败', e); }
+}
+
+// ============================================================
+// 路由
+// ============================================================
+function navigate(route) {
+  state.currentRoute = route;
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.route === route);
+  });
+  render();
+  saveState();
+}
+
+// ============================================================
+// 日志
+// ============================================================
+function addLog(text) {
+  const now = new Date();
+  const time = now.toLocaleTimeString('zh-CN', { hour12: false });
+  // v1.12.16 独立监控窗口无主界面日志区：找不到容器时跳过 DOM 更新（否则 null 报错→所有按钮点击无反应）
+  const tEl = document.getElementById('logTime');
+  const eEl = document.getElementById('logText');
+  if (tEl) tEl.textContent = '[' + time + ']';
+  if (eEl) eEl.textContent = text;
+  // 保留最近 3 条历史，便于查看流程推进
+  if (!addLog._hist) addLog._hist = [];
+  addLog._hist.unshift('[' + time + '] ' + text);
+  if (addLog._hist.length > 3) addLog._hist.length = 3;
+  if (eEl) eEl.title = addLog._hist.join('\n');
+  // v1.6.3 全部日志：完整记录到数组，支持「查看全部日志」
+  if (!addLog._all) addLog._all = [];
+  addLog._all.unshift('[' + time + '] ' + text);
+  if (addLog._all.length > 2000) addLog._all.length = 2000;
+}
+
+// v1.6.3 查看全部日志（弹窗展示完整运行日志）
+function showAllLogs() {
+  const logs = (addLog._all || []).slice().reverse();
+  const html = logs.length
+    ? logs.map(l => escapeHtml(l)).join('<br>')
+    : '<div style="color:var(--text-tertiary);text-align:center;padding:20px">暂无日志</div>';
+  showModal('全部运行日志', `<div style="max-height:60vh;overflow:auto;font-family:var(--mono);font-size:12px;line-height:1.7;word-break:break-all;background:#0d1117;border-radius:8px;padding:12px;color:#c9d1d9">${html}</div>`, [
+    { text: '导出诊断包', class: 'btn-primary', action: () => { exportDiagnostics(); } },
+    { text: '清空日志', class: 'btn-danger', action: () => { addLog._all = []; addLog._hist = []; closeModal(); showToast('日志已清空', 'info'); } },
+    { text: '关闭', class: 'btn-secondary' },
+  ]);
+}
+
+// v1.14.5 一键导出诊断包（日志+代理状态+节点打码+账号摘要 → 桌面 txt）
+function exportDiagnostics() {
+  if (!isElectron || !window.tkAPI || !window.tkAPI.exportDiagnostics) { showToast('请使用桌面版导出', 'warning'); return; }
+  showToast('正在生成诊断包...', 'info');
+  window.tkAPI.exportDiagnostics().then((res) => {
+    if (res && res.success) {
+      navigator.clipboard?.writeText(res.path).catch(() => {});
+      showModal('诊断包已导出', `
+        <div style="font-size:12px;line-height:1.8">
+          诊断包已保存到：<br>
+          <div style="background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:8px;padding:10px;word-break:break-all;font-family:var(--mono)">${res.path}</div>
+          <div class="form-desc" style="margin-top:10px">路径已自动复制到剪贴板。<br>请把这个 txt 文件发给技术人员分析（含日志/代理状态/节点格式打码/账号摘要，不含 Cookie 明文）。</div>
+        </div>
+      `, [{ text: '关闭', class: 'btn-secondary' }]);
+    } else {
+      showToast('导出失败: ' + (res && res.error), 'error');
+    }
+  }).catch(() => showToast('导出失败', 'error'));
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// 运行进度：日志区显示房间 + 百分比 + 进度条
+function updateProgress(data) {
+  const box = document.getElementById('logProgress');
+  const textEl = document.getElementById('logProgressText');
+  const fill = document.getElementById('pbarFill');
+  if (!box || !textEl || !fill) return;
+  const pct = data && data.pct ? data.pct : 0;
+  const acc = state.accounts.find(a => String(a.id) === String(data.accountId));
+  const roomLabel = acc ? (acc.roomName || ('房间 ' + acc.id)) : ('房间 ' + (data.accountId || ''));
+  box.style.display = 'inline-flex';
+  textEl.textContent = roomLabel + ' · ' + pct + '% ' + (data.message || '');
+  fill.style.width = pct + '%';
+  if (pct >= 100) {
+    setTimeout(() => { box.style.display = 'none'; }, 6000);
+  }
+  addLog((data.message || '') + '（' + roomLabel + '，' + pct + '%）');
+}
+
+// ============================================================
+// Toast
+// ============================================================
+function showToast(message, type = 'info') {
+  // v1.12.16 独立监控窗口无 toastContainer：动态创建（否则 null 报错→按钮点击无反应）
+  let container = document.getElementById('toastContainer');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toastContainer';
+    container.style.cssText = 'position:fixed;top:16px;right:16px;z-index:99999;display:flex;flex-direction:column;gap:8px;';
+    document.body.appendChild(container);
+  }
+  const toast = document.createElement('div');
+  toast.className = 'toast ' + type;
+  const icons = {
+    success: '<svg class="ticon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+    error: '<svg class="ticon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+    info: '<svg class="ticon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+  };
+  toast.innerHTML = (icons[type] || icons.info) + '<span>' + message + '</span>';
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(20px)';
+    toast.style.transition = 'all 0.25s';
+    setTimeout(() => toast.remove(), 250);
+  }, 2800);
+}
+
+// ============================================================
+// 渲染主函数
+// ============================================================
+function render() {
+  // v1.10.1 独立监控窗口模式：不渲染主界面（只显示监控面板）
+  if (document.body.classList.contains('monitor-mode')) return;
+  const main = document.getElementById('mainContent');
+  if (state.currentRoute === 'mobile') {
+    main.innerHTML = renderMobileView();
+  } else if (state.currentRoute === 'partner') {
+    main.innerHTML = renderPartnerView();
+  } else if (state.currentRoute === 'nodes') {
+    main.innerHTML = renderNodeView();
+  } else if (state.currentRoute === 'editor') {
+    main.innerHTML = renderEditorView();
+  }
+  updateOverview();
+  updateCounts();
+  refreshSignerBadges();
+}
+
+// v1.12.36 签名服务状态刷新（账号卡片可见：已配置/未配置 + 最近自动生成）
+function refreshSignerBadges() {
+  state.accounts.forEach(acc => {
+    const el = document.getElementById('signerBadge_' + acc.id);
+    if (!el) return;
+    if (!window.tkAPI || !window.tkAPI.signerStatus) return;
+    window.tkAPI.signerStatus({ accountId: acc.id }).then(s => {
+      if (!s) return;
+      // v1.14.7 内置签名：未自定义时显示「签名:内置」，无需手动配置
+      el.textContent = s.configured
+        ? ('签名:' + (s.builtin ? '内置(••••' : '已配置(••••') + (s.keyTail || '') + ')' + (s.lastOk ? ' · 已自动生成' : ''))
+        : '签名:未配置';
+    }).catch(() => {});
+  });
+}
+
+function updateCounts() {
+  const mc = document.getElementById('mobileCount');
+  if (mc) mc.textContent = state.accounts.length;
+}
+
+// ============================================================
+// 手机流开播视图
+// ============================================================
+function renderMobileView() {
+  if (state.accounts.length === 0) {
+    return `
+      <div class="page-header">
+        <div>
+          <div class="page-title">手机流开播</div>
+          <div class="page-subtitle">独立画面 · 手机流开播</div>
+        </div>
+      </div>
+      <div class="empty-state">
+        <div class="icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>
+        </div>
+        <div class="title">暂无开播账号</div>
+        <div class="desc">点击右上角「添加账号」开始配置你的第一个直播间</div>
+      </div>
+    `;
+  }
+
+  const cards = state.accounts.map(acc => renderAccountCard(acc)).join('');
+  return `
+    <div class="page-header">
+      <div>
+        <div class="page-title">手机流开播</div>
+        <div class="page-subtitle">独立画面 · 手机流开播 · 共 ${state.accounts.length} 个房间</div>
+      </div>
+    </div>
+    <div class="account-grid">${cards}</div>
+  `;
+}
+
+function renderAccountCard(acc) {
+  const m = acc.metrics;
+  const loggedIn = !!acc.loggedIn;
+  const statusClass = acc.status === 'live' ? 'live' : (loggedIn ? 'connected' : (acc.status === 'error' ? 'warning' : ''));
+  const statusText = acc.status === 'live' ? '直播中' : (loggedIn ? '已登录' : '未登录');
+
+  const cookieHtml = (acc.cookieInfo && acc.loggedIn) ? `
+    <div class="stream-info">
+      <div class="stream-info-text">
+        <div class="stream-info-title">✓ Cookie 已自动保存（独立会话，可开新窗口登录）</div>
+        <div class="stream-info-meta">
+          已抓取 ${acc.cookieInfo.cookieCount || 0} 条 · 登录时间 ${acc.cookieInfo.capturedAt ? new Date(acc.cookieInfo.capturedAt).toLocaleString('zh-CN', { hour12: false }) : '-'}
+        </div>
+      </div>
+      <div class="stream-info-actions">
+        <button class="btn btn-secondary btn-sm" onclick="exportCookie(${acc.id})">导出Cookie</button>
+        <button class="btn btn-danger btn-sm" onclick="clearAccountLogin(${acc.id})">清除登录</button>
+      </div>
+    </div>
+  ` : '';
+
+  const streamInfo = acc.streamKey ? `
+    <div class="stream-info">
+      <div class="stream-info-text">
+        <div class="stream-info-title">已捕获该账号手机直播推流码</div>
+        <div class="stream-info-meta">
+          服务器: ${acc.rtmpUrl || '（待刷新）'}<br>
+          推流码: ${acc.streamKey.substring(0, 60)}...
+        </div>
+      </div>
+      <div class="stream-info-actions">
+        <button class="btn btn-secondary btn-sm" onclick="showStreamKey(${acc.id})">显示推流码</button>
+        <button class="btn btn-secondary btn-sm" onclick="copyStreamKey(${acc.id})">复制完整地址</button>
+      </div>
+    </div>
+  ` : '';
+
+  const feedHtml = acc.feed && acc.feed.length > 0
+    ? acc.feed.slice(-30).reverse().map(item => `
+        <div class="feed-item">
+          <span class="feed-type ${item.type}">${typeLabel(item.type)}</span>
+          <div class="feed-content">
+            ${item.user ? '<span class="feed-user">' + item.user + '</span> ' : ''}
+            <span class="feed-text">${item.text}</span>
+            ${item.translate ? '<div class="feed-translate">译: ' + item.translate + '</div>' : ''}
+          </div>
+        </div>
+      `).join('')
+    : '<div class="feed-empty"><div class="main">暂无实时动态</div><div class="sub">进场、评论和礼物等互动会显示在这里</div></div>';
+
+  return `
+    <div class="account-card" id="card-${acc.id}">
+      <div class="metrics-bar">
+        <div class="metric"><div class="metric-value">${formatNum(m.online)}</div><div class="metric-label">在线</div></div>
+        <div class="metric"><div class="metric-value">${formatNum(m.likes)}</div><div class="metric-label">点赞</div></div>
+        <div class="metric"><div class="metric-value">${formatNum(m.gifts)}</div><div class="metric-label">礼物</div></div>
+        <div class="metric"><div class="metric-value">${formatNum(m.follows)}</div><div class="metric-label">关注</div></div>
+        <div class="metric"><div class="metric-value">${formatNum(m.enters)}</div><div class="metric-label">进场</div></div>
+        <div class="metric"><div class="metric-value">${formatNum(m.comments)}</div><div class="metric-label">评论</div></div>
+      </div>
+
+      <div class="card-actions-bar">
+        <!-- v1.13.0 第一行：状态 + 主操作（获取推流码/开始推流，大按钮醒目） -->
+        <div class="actions-row actions-row-main">
+          <div class="status-indicator">
+            <span class="status-dot ${statusClass}"></span>
+            <span>${statusText}</span>
+            <span class="room-badge">${acc.roomName || ('房间 ' + acc.id)} · 独立窗口</span>
+          </div>
+          <span class="status-tag ${acc.streaming ? 'live' : ''}">内置·${acc.streaming ? '推流中' : (acc.streamKey ? '已配置' : '未配置画面')}</span>
+          <input class="account-input" value="${acc.name}" placeholder="TikTok 账号名（不带 @）" onchange="updateAccountName(${acc.id}, this.value)">
+          <button class="btn btn-primary btn-main" onclick="getStreamKey(${acc.id})">获取推流码</button>
+          <button class="btn ${acc.streaming ? 'btn-danger' : 'btn-success'} btn-main" onclick="toggleStream(${acc.id})">
+            ${acc.starting ? '正在启动推流…' : (acc.streaming ? '停止推流' : (acc.retrying ? '推流重试中…(点击取消)' : '开始内置推流'))}
+          </button>
+          <select class="engine-select" onchange="setStreamEngine(${acc.id}, this.value)" title="推流引擎：FFmpeg=内置直推(已验证，推荐)；OBS=内置便携OBS(多素材/滤镜合成，隐藏运行)">
+            <option value="ffmpeg" ${!acc.useOBS ? 'selected' : ''}>引擎:FFmpeg</option>
+            <option value="obs" ${acc.useOBS ? 'selected' : ''}>引擎:OBS(内置)</option>
+          </select>
+        </div>
+        <!-- v1.13.0 第二行：功能按钮分组（账号/画面/推流/窗口）；v1.13.4 按钮均分填满消除尾部空白 -->
+        <div class="actions-row actions-row-tools">
+          <span class="action-group-label">账号</span>
+          <button class="btn btn-secondary btn-sm" onclick="loginAccount(${acc.id})">${loggedIn ? '重新登录' : '登录'}</button>
+          <button class="btn btn-ghost btn-sm" onclick="showCookieOps(${acc.id})">Cookie</button>
+          <span class="action-group-label">画面</span>
+          <button class="btn btn-secondary btn-sm" onclick="openEditor(${acc.id})">画面编辑</button>
+          <button class="btn btn-secondary btn-sm" onclick="choosePushVideo(${acc.id})" title="选择推流视频素材（手机流接管时观众看到此视频画面）">选择视频</button>
+          ${acc.pushVideo ? `<span class="push-video-tag" title="${acc.pushVideo}">素材:${acc.pushVideo.split(/[\\/]/).pop()}</span>` : ''}
+          <span class="action-group-label">推流</span>
+          <button class="btn btn-ghost btn-sm" onclick="regetStreamKey(${acc.id})" title="这场直播结束后重新获取新的推流码（每场直播推流码不同）">重新获取</button>
+          <button class="btn btn-ghost btn-sm" onclick="manualStreamKey(${acc.id})" title="手机 App 直播设置 Stream to PC 里复制推流地址与推流码后粘贴">手动填码</button>
+          <button class="btn btn-ghost btn-sm" onclick="signerConfig(${acc.id})" title="配置签名服务（抖歪同款 RapidAPI 签名，Node 直连不被风控）">签名服务</button>
+          <span class="signer-badge" id="signerBadge_${acc.id}" style="font-size:11px;opacity:0.85">签名:配置中...</span>
+          <span class="action-group-label">窗口</span>
+          <button class="btn btn-ghost btn-sm" onclick="openProducerWindow(${acc.id})">打开后台</button>
+          <button class="btn btn-ghost btn-sm" onclick="openLiveWindow(${acc.id})">打开直播间</button>
+        </div>
+      </div>
+
+      ${cookieHtml}
+
+      ${streamInfo}
+
+      <div class="auto-interact">
+        <div class="interact-row">
+          <!-- v1.15.8 自动互动恢复：仅 @提及 + 关键词手动配置回复；点赞/关注/礼物自动回复已从主进程关闭（防平台风控） -->
+          <label class="checkbox-wrap">
+            <input type="checkbox" ${acc.autoInteract.enabled ? 'checked' : ''} onchange="toggleAutoInteract(${acc.id}, this.checked)">
+            自动互动: @提及+关键词回复
+          </label>
+          <select class="select" onchange="setInteractLang(${acc.id}, this.value)">
+            <option ${acc.autoInteract.lang === '英语(美区)' ? 'selected' : ''}>英语(美区)</option>
+            <option ${acc.autoInteract.lang === '英语(英区)' ? 'selected' : ''}>英语(英区)</option>
+            <option ${acc.autoInteract.lang === '日语' ? 'selected' : ''}>日语</option>
+            <option ${acc.autoInteract.lang === '韩语' ? 'selected' : ''}>韩语</option>
+            <option ${acc.autoInteract.lang === '西班牙语' ? 'selected' : ''}>西班牙语</option>
+            <option ${acc.autoInteract.lang === '葡萄牙语' ? 'selected' : ''}>葡萄牙语</option>
+          </select>
+          <button class="btn btn-ghost btn-sm ${acc.monitorRunning ? 'btn-live' : ''}" onclick="${acc.monitorRunning ? 'showMonitor(' + acc.id + ')' : 'toggleMonitor(' + acc.id + ')'}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            ${acc.monitorRunning ? '监控窗口' : '实时监控'}
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="showReplyAssistant(${acc.id})">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            智能回复
+          </button>
+        </div>
+        <div class="interact-row">
+          <span style="font-size:13px;font-weight:600;color:var(--text-primary)">冷启动</span>
+          <label class="checkbox-wrap">
+            <input type="checkbox" ${acc.autoInteract.coldStart ? 'checked' : ''} onchange="toggleColdStart(${acc.id}, this.checked)">
+            启用
+          </label>
+          <span style="font-size:11px;color:var(--text-tertiary)">全局设置 · 所有房间共用，分别执行（手动开关，你自己决定用不用）</span>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="flex:1">
+            <div class="form-label" style="margin-bottom:4px">开播欢迎语</div>
+            <textarea class="textarea" rows="2" onchange="setWelcomeMsg(${acc.id}, this.value)">${acc.autoInteract.welcomeMsg}</textarea>
+            <div class="hint-text">用句号「。」或「.」分隔，每句最多 80 字符。开播连接就绪后随机发 3 条，至少间隔 25 秒；重连不重复触发。</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" style="flex-shrink:0;margin-top:22px" onclick="saveAccountConfig(${acc.id})">保存文案</button>
+        </div>
+      </div>
+
+      <div class="feed-section">
+        <div class="feed-header">
+          <span class="feed-title">实时动态</span>
+          <div class="feed-actions">
+            <button class="btn btn-ghost btn-sm" onclick="clearFeed(${acc.id})">清空</button>
+          </div>
+        </div>
+        <div class="feed-box">${feedHtml}</div>
+      </div>
+    </div>
+  `;
+}
+
+function typeLabel(type) {
+  return { comment: '评论', enter: '进场', gift: '礼物', like: '点赞', follow: '关注', system: '系统', risk: '风险', online: '在线' }[type] || type;
+}
+
+function formatNum(n) {
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+  return n.toString();
+}
+
+// ============================================================
+// 伴侣流开播视图
+// ============================================================
+function renderPartnerView() {
+  if (state.partnerRooms.length === 0) {
+    return `
+      <div class="page-header">
+        <div>
+          <div class="page-title">伴侣流开播</div>
+          <div class="page-subtitle">此开播页面暂未添加房间</div>
+        </div>
+      </div>
+      <div class="add-node-form">
+        <div style="font-size:16px;font-weight:700;margin-bottom:16px">添加节点</div>
+        <div class="form-group">
+          <label class="form-label">节点名称（可选）</label>
+          <input class="form-input" placeholder="例如：美国线路 1" id="partnerNodeName">
+        </div>
+        <div class="form-group">
+          <label class="form-label">节点链接</label>
+          <input class="form-input" placeholder="vless://、vmess:// 或 socks5://" id="partnerNodeUrl">
+          <div class="form-desc">v1.13.11 内置 xray 代理内核：vless://、vmess://、socks5:// 节点均可在软件内直接使用（无需桌面 v2/v2rayN）。保存节点后重启软件，软件自动用内置内核起本地代理（10888），页面/API 全部走节点。测速完整样本最多约 12 MiB；短时测速不代表持续开播带宽。</div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-secondary" onclick="addPartnerNode(false)">保存节点</button>
+          <button class="btn btn-primary" onclick="addPartnerNode(true)">保存并测试</button>
+        </div>
+      </div>
+    `;
+  }
+  return `<div class="page-header"><div class="page-title">伴侣流开播</div></div><div>共 ${state.partnerRooms.length} 个房间</div>`;
+}
+
+// ============================================================
+// 节点管理视图
+// ============================================================
+function renderNodeView() {
+  const nodeCards = state.nodes.map(node => `
+    <div class="node-card">
+      <div class="node-info">
+        <div class="node-name">${node.name}</div>
+        <div class="node-meta">${node.assignedAccounts} 个账号已分配</div>
+        <div class="node-status ${node.status === 'connected' ? 'success' : (node.status === 'testing' ? 'warning' : '')}">
+          <span class="status-dot ${node.status === 'connected' ? 'connected' : (node.status === 'testing' ? 'warning' : '')}"></span>
+          ${node.status === 'testing' ? '测试中...' : (node.status === 'connected' ? ('测试通过 · 出口 ' + node.ip + ' · 延迟 ' + node.ping + ' ms' + (node.downMBps ? (' · 下行 ' + node.downMBps + ' MB/s' + (node.upMBps ? (' · 上行 ' + node.upMBps + ' MB/s') : '')) : '')) : (node.testResult ? node.testResult : '未测试'))}
+        </div>
+      </div>
+      <div class="node-actions">
+        <button class="btn btn-secondary btn-sm" onclick="testNode(${node.id})">${node.status === 'testing' ? '测试中...' : '测试节点'}</button>
+        <button class="btn btn-secondary btn-sm" onclick="editNode(${node.id})">编辑</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteNode(${node.id})">删除</button>
+      </div>
+    </div>
+  `).join('');
+
+  return `
+    <div class="page-header">
+      <div>
+        <div class="page-title">节点与账号分配</div>
+        <div class="page-subtitle">NETWORK · v1.3 · 真实测试</div>
+      </div>
+      <button class="btn btn-secondary" onclick="navigate('mobile')">返回控制台</button>
+      <button class="btn btn-primary" onclick="testAllNodes()" style="margin-left:8px">测试全部节点</button>
+    </div>
+    <div style="font-size:12px;color:var(--text-secondary);line-height:1.7;margin-bottom:16px">
+      v1.13.11 本软件内置 xray 代理内核（不依赖桌面 v2/v2rayN）：保存 vless/vmess/socks5 节点后，重启软件即自动用内置内核起本地代理（10888），小电视/监控/后台页/API 全部走节点。无节点时直连（推流本就直连）。换电脑只需把节点链接重新粘贴保存即可正常工作。
+    </div>
+
+    <div class="add-node-form">
+      <div style="font-size:16px;font-weight:700;margin-bottom:16px">添加节点</div>
+      <div class="form-group">
+        <label class="form-label">节点名称（可选）</label>
+        <input class="form-input" placeholder="例如：美国线路 1" id="newNodeName">
+      </div>
+      <div class="form-group">
+        <label class="form-label">节点链接</label>
+        <input class="form-input" placeholder="socks5:// 或 vless://、vmess://" id="newNodeUrl">
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-secondary" onclick="addNode(false)">保存节点</button>
+        <button class="btn btn-primary" onclick="addNode(true)">保存并测试</button>
+      </div>
+    </div>
+
+    ${state.nodes.length === 0 ? '<div class="empty-state" style="padding:28px 0"><div class="title" style="font-size:14px">暂无节点</div><div class="desc" style="font-size:12px">添加你自己的真实节点后，可为每个房间单独分配</div></div>' : `
+    <div style="font-size:15px;font-weight:700;margin-bottom:12px">保存的节点</div>
+    <div class="node-list">${nodeCards}</div>`}
+
+    <div style="font-size:15px;font-weight:700;margin:28px 0 12px">账号与节点分配</div>
+    <div class="assign-list">
+      ${state.accounts.map((acc, idx) => `
+        <div class="assign-row">
+          <div class="assign-account">
+            <div class="idx">${acc.roomName || ('房间 ' + acc.id)}</div>
+            <div class="name">${acc.name || '未填写账号名'}</div>
+          </div>
+          <select class="select assign-select" onchange="assignNodeToAccount(${acc.id}, this.value)">
+            <option value="">未分配</option>
+            ${state.nodes.map(n => `<option value="${n.id}" ${acc.nodeId === n.id ? 'selected' : ''}>${n.name}</option>`).join('')}
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="saveAssignment(${acc.id})">保存分配</button>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+// ============================================================
+// 画面编辑器视图
+// ============================================================
+function getScene(accId) {
+  if (!state.editorScenes[accId]) {
+    state.editorScenes[accId] = {
+      layers: [],
+      selectedLayerId: null,
+      outputVolume: 1,
+      monitorEnabled: false,
+    };
+  }
+  return state.editorScenes[accId];
+}
+
+function renderEditorView() {
+  const acc = state.accounts.find(a => String(a.id) === String(state.editingAccountId));
+  if (!acc) {
+    return '<div class="empty-state"><div class="title">未选择账号</div><div class="desc">请从控制台点击「画面编辑」</div></div>';
+  }
+  const scene = getScene(acc.id);
+  const selectedLayer = scene.layers.find(l => l.id === scene.selectedLayerId);
+
+  const roomItems = state.accounts.map(a => `
+    <div class="editor-room-item ${a.id === acc.id ? 'active' : ''}" onclick="switchEditorRoom(${a.id})">
+      <div class="rname">${a.name || '未命名'}</div>
+      <div class="rstatus">已就绪 · x264</div>
+    </div>
+  `).join('');
+
+  const layerItems = scene.layers.length === 0
+    ? '<div style="font-size:12px;color:var(--text-tertiary);padding:10px;text-align:center">点击画布下方「添加素材」上传视频/图片</div>'
+    : scene.layers.slice().reverse().map(l => `
+      <div class="layer-item ${l.id === scene.selectedLayerId ? 'active' : ''}" onclick="selectLayer(${acc.id}, ${l.id})">
+        <svg class="licon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${l.type === 'video' ? '<rect x="2" y="3" width="20" height="14" rx="2"/><polygon points="10 8 16 11 10 14 10 8"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>' : '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>'}</svg>
+        <span class="lname">${l.name}</span>
+        <span style="font-size:10px;color:var(--text-tertiary);margin-left:auto">${l.type === 'video' ? '视频' : '图片'}</span>
+      </div>
+    `).join('');
+
+  const propPanel = selectedLayer ? `
+    <div class="form-group" style="margin-bottom:10px">
+      <div class="prop-label">名称</div>
+      <input class="prop-input" value="${selectedLayer.name}" onchange="updateLayerProp(${acc.id}, 'name', this.value)">
+    </div>
+    <div class="form-group" style="margin-bottom:10px">
+      <div class="prop-label">文件</div>
+      <div class="flex gap-1">
+        <input class="prop-input" value="${selectedLayer.fileName || ''}" readonly style="flex:1;opacity:0.7">
+        <button class="btn btn-secondary btn-sm" style="padding:0 8px" onclick="triggerFileInput(${acc.id})">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        </button>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text-tertiary);margin:12px 0 6px">变换</div>
+    <div class="prop-row">
+      <div><div class="prop-label">位置 X</div><input class="prop-input" type="number" value="${selectedLayer.x}" onchange="updateLayerProp(${acc.id}, 'x', parseFloat(this.value))"></div>
+      <div><div class="prop-label">位置 Y</div><input class="prop-input" type="number" value="${selectedLayer.y}" onchange="updateLayerProp(${acc.id}, 'y', parseFloat(this.value))"></div>
+    </div>
+    <div class="prop-row">
+      <div><div class="prop-label">宽度</div><input class="prop-input" type="number" value="${Math.round(selectedLayer.width)}" onchange="updateLayerProp(${acc.id}, 'width', parseFloat(this.value))"></div>
+      <div><div class="prop-label">高度</div><input class="prop-input" type="number" value="${Math.round(selectedLayer.height)}" onchange="updateLayerProp(${acc.id}, 'height', parseFloat(this.value))"></div>
+    </div>
+    <div class="prop-row">
+      <div><div class="prop-label">旋转 / °</div><input class="prop-input" type="number" value="${selectedLayer.rotation}" onchange="updateLayerProp(${acc.id}, 'rotation', parseFloat(this.value))"></div>
+      <div style="display:flex;align-items:flex-end;gap:8px;padding-bottom:4px">
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:var(--text-secondary)">
+          <input type="checkbox" ${selectedLayer.flipH ? 'checked' : ''} onchange="updateLayerProp(${acc.id}, 'flipH', this.checked)" style="accent-color:var(--primary)"> 水平
+        </label>
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:var(--text-secondary)">
+          <input type="checkbox" ${selectedLayer.flipV ? 'checked' : ''} onchange="updateLayerProp(${acc.id}, 'flipV', this.checked)" style="accent-color:var(--primary)"> 垂直
+        </label>
+      </div>
+    </div>
+    ${selectedLayer.type === 'video' ? `
+    <div style="font-size:11px;color:var(--text-tertiary);margin:12px 0 6px">视频控制</div>
+    <div class="prop-row full">
+      <div><div class="prop-label">音量 (${Math.round(selectedLayer.volume * 100)}%)</div>
+        <input type="range" min="0" max="100" value="${selectedLayer.volume * 100}" class="volume-slider" oninput="updateLayerProp(${acc.id}, 'volume', this.value / 100);this.previousElementSibling.textContent='音量 ('+this.value+'%)'">
+      </div>
+    </div>
+    <div class="prop-row full" style="margin-top:8px">
+      <button class="btn btn-secondary btn-sm" onclick="toggleVideoPlay(${acc.id}, ${selectedLayer.id})" id="playBtn_${selectedLayer.id}">${selectedLayer.playing ? '暂停' : '播放'}</button>
+      <button class="btn btn-secondary btn-sm" onclick="restartVideo(${acc.id}, ${selectedLayer.id})">重新开始</button>
+    </div>
+    ` : ''}
+  ` : '<div style="font-size:12px;color:var(--text-tertiary);padding:20px 0;text-align:center">选择一个图层以编辑属性</div>';
+
+  return `
+    <input type="file" id="layerFileInput_${acc.id}" accept="video/*,image/*" style="display:none" onchange="handleLayerFileUpload(${acc.id}, this.files[0])">
+    <div class="editor-layout">
+      <div class="editor-left">
+        <div style="padding:0 16px 10px;font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase">房间</div>
+        ${roomItems}
+      </div>
+      <div class="editor-center">
+        <div class="editor-header">
+          <div>
+            <div class="editor-title">${acc.name}</div>
+            <div class="editor-meta">已就绪 &nbsp; 720 × 1280 / 30 FPS / 3000 Kbps</div>
+          </div>
+          <div class="flex gap-2 items-center">
+            <button class="btn btn-secondary" onclick="navigate('mobile')">返回控制台</button>
+          </div>
+        </div>
+
+        <div class="stream-panel">
+          <div class="stream-panel-header">
+            <div class="stream-tabs">
+              <span class="stream-tab active">内置推流</span>
+            </div>
+            <button class="btn btn-secondary btn-sm" style="padding:0 8px" onclick="manualStreamKey(${acc.id})" title="手机 App 获取推流码后手动填写">手动填推流码</button>
+            <button class="btn btn-secondary btn-sm" style="padding:0 8px" onclick="regetStreamKey(${acc.id})" title="这场直播结束后重新获取新的推流码（每场直播推流码不同）">重新获取推流码</button>
+            <button class="btn ${acc.streaming ? 'btn-danger' : 'btn-primary'}" onclick="toggleStream(${acc.id})">
+              ${acc.streaming ? '停止推流' : '开始推流'}
+            </button>
+          </div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;font-family:var(--mono)">
+            ${acc.name} · ${acc.streamKey ? '已捕获推流码（' + (acc.rtmpUrl || 'rtmp://') + ' 自动推流）' : '未获取推流码：开始推流自动获取，或点「手动填推流码」从手机 App 粘贴'}
+          </div>
+          <div class="stream-stats">
+            <div class="stream-stat"><div class="label">推流状态</div><div class="value ${acc.streaming ? '' : 'error'}">${acc.streaming ? '推流中' : '未推流'}</div></div>
+            <div class="stream-stat"><div class="label">画面来源</div><div class="value">画面编辑输出</div></div>
+            <div class="stream-stat"><div class="label">分辨率 / 帧率</div><div class="value">720×1280 / 30</div></div>
+            <div class="stream-stat"><div class="label">房间状态</div><div class="value">${acc.status === 'live' ? '直播中' : '未开始'}</div></div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <span class="status-dot warning"></span>
+            <span style="font-size:13px;font-weight:600">草稿</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="btn btn-secondary btn-sm" onclick="saveScene(${acc.id})">保存场景</button>
+            <span style="font-size:12px;color:var(--text-tertiary);margin:0 8px">·</span>
+            <span class="status-dot connected"></span>
+            <span style="font-size:13px;font-weight:600">当前输出</span>
+          </div>
+          <button class="btn btn-primary" onclick="applyToOutput(${acc.id})">应用到输出</button>
+        </div>
+
+        <div class="canvas-area">
+          <div class="canvas-frame">
+            <div class="canvas-preview" id="previewCanvas_${acc.id}">
+              <canvas width="720" height="1280"></canvas>
+              ${scene.layers.length === 0 ? `
+                <div class="placeholder-text">
+                  <div class="big">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><polygon points="10 8 16 11 10 14 10 8"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                  </div>
+                  <div>暂无素材</div>
+                  <div style="font-size:11px;opacity:0.7">点击下方按钮上传视频或图片</div>
+                </div>
+              ` : ''}
+              <div class="upload-hint" onclick="triggerFileInput(${acc.id})">+ 添加素材</div>
+            </div>
+            <div class="canvas-label">PREVIEW · 草稿 · <span class="fps" id="fps_${acc.id}">30.0 FPS</span></div>
+          </div>
+          <div class="canvas-frame">
+            <div class="canvas-preview" id="outputCanvas_${acc.id}" style="opacity:0.85">
+              <canvas width="720" height="1280"></canvas>
+              <div class="placeholder-text" style="display:none" id="outputEmpty_${acc.id}">
+                <div style="font-size:13px">输出画面</div>
+                <div style="font-size:11px;opacity:0.7">点击「应用到输出」</div>
+              </div>
+            </div>
+            <div class="canvas-label">OUTPUT · 推流输出 · <span class="fps">30.0 FPS</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="editor-right">
+        <div class="panel-box">
+          <div class="panel-title">
+            来源图层
+            <div class="flex gap-1">
+              <button class="btn btn-ghost btn-sm" style="padding:0 6px" onclick="triggerFileInput(${acc.id})" title="添加素材">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              </button>
+              <button class="btn btn-ghost btn-sm" style="padding:0 6px" onclick="moveLayer(${acc.id}, -1)" title="上移">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
+              </button>
+              <button class="btn btn-ghost btn-sm" style="padding:0 6px" onclick="moveLayer(${acc.id}, 1)" title="下移">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <button class="btn btn-ghost btn-sm" style="padding:0 6px;color:var(--danger)" onclick="deleteSelectedLayer(${acc.id})" title="删除">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              </button>
+            </div>
+          </div>
+          ${layerItems}
+        </div>
+
+        <div class="panel-box">
+          <div class="panel-title">来源属性</div>
+          ${propPanel}
+        </div>
+
+        <div class="panel-box">
+          <div class="panel-title">输出混音</div>
+          <div class="flex items-center justify-between mb-2">
+            <span style="font-size:12px;color:var(--text-secondary)">主音量</span>
+            <span style="font-size:12px;font-weight:600" id="masterVolLabel">${Math.round(scene.outputVolume * 100)}%</span>
+          </div>
+          <input type="range" class="volume-slider" min="0" max="100" value="${scene.outputVolume * 100}" oninput="setMasterVolume(${acc.id}, this.value/100);document.getElementById('masterVolLabel').textContent=this.value+'%'">
+          <div style="margin-top:10px;font-size:11px;color:var(--text-tertiary)">
+            ${scene.layers.filter(l => l.type === 'video').length > 0 ? scene.layers.filter(l=>l.type==='video').map(l => '<div style="margin-bottom:4px">'+l.name+': '+Math.round(l.volume*100)+'%</div>').join('') : '暂无音轨'}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ============================================================
+// 实时总览更新
+// ============================================================
+function updateOverview() {
+  const total = state.accounts.length;
+  const connected = state.accounts.filter(a => a.status === 'connected' || a.status === 'live').length;
+  const streaming = state.accounts.filter(a => a.streaming).length;
+  const errors = state.accounts.filter(a => a.status === 'error').length;
+
+  document.getElementById('ovTotal').innerHTML = total + '<span class="unit">个</span>';
+  document.getElementById('ovSub').textContent = '当前已添加账号';
+  document.getElementById('ovMonitor').textContent = connected + ' / ' + total;
+  document.getElementById('ovMonitorSub').textContent = '已登录 ' + connected;
+  document.getElementById('ovStream').innerHTML = '上传中 ' + streaming;
+  document.getElementById('ovStreamSub').textContent = '推流失败 ' + errors + ' · 房间异常 ' + errors;
+  document.getElementById('ovRooms').textContent = '已配置 ' + total + ' 个';
+  document.getElementById('ovRoomsSub').textContent = '已配置' + (total - errors) + ' · 异常' + errors;
+
+  const alertEl = document.getElementById('ovAlert');
+  if (total === 0) {
+    alertEl.style.display = 'block';
+    document.getElementById('ovAlertText').textContent = '暂无房间：点右上角「+ 添加账号」创建（一个房间一个号）';
+  } else if (errors > 0 || connected < total) {
+    alertEl.style.display = 'block';
+    document.getElementById('ovAlertText').textContent = '部分状态需要关注：' + (total - connected) + ' 个房间未登录 · 推流失败' + errors;
+  } else {
+    alertEl.style.display = 'none';
+  }
+}
+
+function refreshOverview() {
+  updateOverview();
+  showToast('总览已刷新', 'success');
+}
+
+// ============================================================
+// 账号操作
+// ============================================================
+function updateAccountName(id, name) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (acc) {
+    acc.name = name.trim();
+    saveState();
+    addLog((acc.roomName || ('房间 ' + id)) + ' 名称已更新为 ' + acc.name);
+  }
+}
+
+function loginAccount(id) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (!acc) return;
+
+  if (isElectron && window.tkAPI) {
+    // 桌面版：为该房间新建独立登录窗口（每账号独立会话，登录后自动抓取 Cookie）
+    showToast('正在为 ' + (acc.roomName || ('房间 ' + id)) + ' 新建独立登录窗口...', 'info');
+    addLog('打开独立登录窗口: ' + (acc.roomName || ('房间 ' + id)) + (acc.name ? ' @' + acc.name : ''));
+    window.tkAPI.openTikTokLogin({ accountId: id, accountName: acc.name });
+
+    // 监听登录态变化（Cookie 自动抓取成功后回写）
+    if (!window._loginStateBound) {
+      window.tkAPI.onLoginStateChanged(({ accountId, loggedIn, cookieCount, capturedAt }) => {
+        const a = state.accounts.find(x => String(x.id) === String(accountId));
+        if (a) {
+          a.loggedIn = loggedIn;
+          if (loggedIn) {
+            a.status = 'connected';
+            a.cookieInfo = { cookieCount: cookieCount || 0, capturedAt };
+            showToast('房间' + accountId + ' Cookie 已自动抓取（' + (cookieCount || 0) + ' 条）', 'success');
+            addLog('房间' + accountId + ' 登录成功，Cookie 已自动保存');
+          } else {
+            a.loggedIn = false;
+            a.cookieInfo = null;
+            a.status = 'disconnected';
+            addLog('房间' + accountId + ' 登录态已清除');
+          }
+          saveState();
+          if (state.currentRoute === 'mobile') render();
+        }
+      });
+      window._loginStateBound = true;
+    }
+
+    // 启动时回读一次该房间已保存的登录态
+    window.tkAPI.getAccountAuth({ accountId: id }).then((auth) => {
+      const a = state.accounts.find(x => String(x.id) === String(id));
+      if (a && auth && auth.loggedIn && !a.loggedIn) {
+        a.loggedIn = true;
+        a.status = 'connected';
+        a.cookieInfo = { cookieCount: auth.cookieCount || 0, capturedAt: auth.capturedAt };
+        saveState();
+        if (state.currentRoute === 'mobile') render();
+      }
+    });
+  } else {
+    showToast('请使用桌面版登录（当前为网页预览）', 'warning');
+  }
+}
+
+// 打开该账号的直播中心后台：每次都是新窗口
+function openProducerWindow(id) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (!acc) return;
+  if (isElectron && window.tkAPI) {
+    window.tkAPI.openProducerWindow({ accountId: id, accountName: acc.name });
+    addLog('打开直播中心（新窗口）: 房间' + id + (acc.name ? ' @' + acc.name : ''));
+  }
+}
+
+// 打开该账号的直播间页面：每次都是新窗口，真实监控
+function openLiveWindow(id) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (!acc) return;
+  if (isElectron && window.tkAPI) {
+    window.tkAPI.openLiveWindow({ accountId: id, accountName: acc.name });
+    addLog('打开直播间（新窗口）: 房间' + id + (acc.name ? ' @' + acc.name : ''));
+  } else {
+    if (acc.name) {
+      window.open('https://www.tiktok.com/@' + acc.name.replace(/^@/, '') + '/live', '_blank');
+    } else {
+      showToast('请先填写账号名', 'error');
+    }
+  }
+}
+
+// Cookie 操作弹窗（手动导入兜底）
+function showCookieOps(id) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (!acc) return;
+  showModal((acc.roomName || ('房间 ' + id)) + ' · Cookie 管理', `
+    <div style="font-size:13px;line-height:1.7;color:var(--text-secondary);margin-bottom:12px">
+      每个房间使用完全独立的浏览器会话。推荐方式：点「登录」在软件内登录，登录成功后 <b>自动抓取 Cookie</b> 并保存。
+      如果登录窗口不方便，也可以从浏览器（已登录 TikTok 的）复制 Cookie 粘贴到下面导入。
+    </div>
+    <div class="form-group">
+      <label class="form-label">粘贴 Cookie（name=value; name2=value2 或 JSON 数组）</label>
+      <textarea class="textarea" rows="6" id="manualCookieText" placeholder="sessionid=xxxx; tt_csrf_token=xxxx; ..."></textarea>
+    </div>
+  `, [
+    { text: '导入 Cookie', class: 'btn-primary', action: () => {
+      const cookieString = document.getElementById('manualCookieText').value;
+      if (!cookieString.trim()) { showToast('请先粘贴 Cookie', 'error'); return; }
+      window.tkAPI.saveManualCookies({ accountId: id, accountName: acc.name, cookieString }).then((res) => {
+        closeModal();
+        if (res.success) {
+          showToast('Cookie 导入成功（' + res.cookieCount + ' 条）', 'success');
+          addLog('房间' + id + ' 手动导入 Cookie ' + res.cookieCount + ' 条');
+          const a = state.accounts.find(x => String(x.id) === String(id));
+          if (a) {
+            a.loggedIn = true;
+            a.status = 'connected';
+            a.cookieInfo = { cookieCount: res.cookieCount, capturedAt: Date.now() };
+            saveState();
+            render();
+          }
+        } else {
+          showToast('导入失败: ' + res.error, 'error');
+        }
+      });
+    }},
+    { text: '取消', class: 'btn-secondary' },
+  ]);
+}
+
+// 导出该房间已保存的 Cookie
+function exportCookie(id) {
+  if (!isElectron || !window.tkAPI) return;
+  window.tkAPI.exportCookies({ accountId: id }).then((res) => {
+    if (res.success) {
+      showModal('导出 Cookie', `
+        <div style="font-size:12px;line-height:1.8;word-break:break-all;font-family:var(--mono);background:var(--bg-elevated);border:1px solid var(--border-light);border-radius:8px;padding:12px;max-height:260px;overflow:auto">${res.cookieString}</div>
+        <div class="form-desc" style="margin-top:8px">共 ${res.cookieCount} 条，已自动复制到剪贴板。</div>
+      `, [{ text: '关闭', class: 'btn-secondary' }]);
+      navigator.clipboard?.writeText(res.cookieString).catch(() => {});
+    } else {
+      showToast(res.error, 'error');
+    }
+  });
+}
+
+// 清除该房间登录态
+function clearAccountLogin(id) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (!acc) return;
+  showConfirmModal('清除登录', '确定清除 ' + (acc.roomName || ('房间 ' + id)) + (acc.name ? ' @' + acc.name : '') + ' 的登录态吗？\n将清空该房间独立会话中的 Cookie。', () => {
+    if (isElectron && window.tkAPI) {
+      window.tkAPI.clearLogin({ accountId: id });
+    }
+    acc.loggedIn = false;
+    acc.cookieInfo = null;
+    acc.status = 'disconnected';
+    acc.streamKey = '';
+    saveState();
+    render();
+    showToast('登录态已清除', 'success');
+    addLog('清除登录: ' + (acc.roomName || ('房间 ' + id)));
+  });
+}
+
+// 手动填写推流码（手机 App「Stream to PC」里的 Server URL + Stream Key）
+// v1.6.4 手动填推流码：Electron 禁用 prompt，改用内置弹窗（textarea 粘贴）
+function manualStreamKey(id) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (!acc) return;
+  const cur = (acc.rtmpUrl || '') + (acc.streamKey ? '/' + acc.streamKey : '');
+  showModal('手动填推流码 · 房间' + id, `
+    <div style="font-size:13px;line-height:1.8;color:var(--text-secondary);margin-bottom:10px">
+      从手机 App 开播页复制推流信息（<b>完整 rtmp:// 推流地址</b>，含 stream- 和签名）粘贴到下面：<br>
+      <span style="color:var(--text-tertiary)">支持格式：<br>① 完整推流地址（推荐）：rtmp://push-xxx.tiktokcdn.com/stage/stream-123?sign=...<br>② 地址 + 空格 + 推流码</span>
+    </div>
+    <textarea id="manualKeyInput" style="width:100%;min-height:100px;background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:6px;padding:10px;font-family:var(--mono);font-size:12px;box-sizing:border-box" placeholder="rtmp://push-xxx.tiktokcdn.com/stage/stream-123?sign=...">${escapeHtml(cur)}</textarea>
+  `, [
+    { text: '保存并使用', class: 'btn-primary', action: () => { const v = document.getElementById('manualKeyInput').value.trim(); if (!v) { showToast('内容为空，请先复制推流地址', 'warning'); return; } parseAndSaveManualKey(id, v); closeModal(); } },
+    { text: '取消', class: 'btn-secondary' },
+  ]);
+}
+
+function parseAndSaveManualKey(id, input) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (!acc) return;
+  let rtmpUrl = '', streamKey = '';
+  const m = input.match(/(rtmps?:\/\/[^\s"'<>]+)/i);
+  if (m) {
+    // 完整地址整体保存（含 query/签名），推流时 buildPushUrl 检测到 stream-/? 直接使用，不再拼接
+    rtmpUrl = m[1].trim();
+    const km = rtmpUrl.match(/stream-[^\s\/?]+/i);
+    if (km) streamKey = km[0];
+  } else if (/^stream-/i.test(input.trim())) {
+    streamKey = input.trim();
+    showToast('只有推流码不够：请把完整 rtmp:// 推流地址一起复制粘贴（手机 App 里两个通常同时显示）', 'warning');
+    return;
+  } else {
+    showToast('无法识别：请粘贴 rtmp:// 开头的完整推流地址', 'error');
+    return;
+  }
+  acc.rtmpUrl = rtmpUrl;
+  acc.streamKey = streamKey;
+  acc.status = 'connected';
+  saveState();
+  render();
+  showToast('推流地址已保存，可直接开始推流', 'success');
+  addLog((acc.roomName || ('房间 ' + acc.id)) + ' 手动填写推流地址: ' + rtmpUrl.substring(0, 90) + (rtmpUrl.length > 90 ? '...' : ''));
+}
+
+function getStreamKey(id, silent) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (!acc) return;
+  if (!acc.loggedIn) {
+    showToast('请先登录该房间（Cookie 登录）', 'error');
+    return;
+  }
+  if (isElectron && window.tkAPI) {
+    // 已持有推流码时提示直接用（换码请用「重新获取推流码」按钮）
+    if (acc.streamKey) {
+      showToast('房间已持有推流码，直接开始推流即可；换新推流码请点「重新获取推流码」', 'info');
+      return;
+    }
+    if (acc.streaming) {
+      showToast('请先停止推流，再获取推流码', 'warning');
+      return;
+    }
+    fetchStreamKeyViaApi(id);
+  } else {
+    showToast('请使用桌面版获取真实推流码', 'warning');
+  }
+}
+
+// v1.6.4 统一 API 拿码执行体（getStreamKey / regetStreamKey 共用）
+function fetchStreamKeyViaApi(id) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (!acc) return;
+  showToast('正在通过 API 通道获取推流码（自动创建直播间）...', 'info');
+  addLog('自动获取推流码(API通道): 房间' + id + (acc.name ? ' @' + acc.name : ''));
+  window.tkAPI.getStreamKeyByApi({ accountId: id, accountName: acc.name }).then(res => {
+    if (res && res.success && res.rtmpUrl) {
+      acc.status = 'connected';
+      acc.rtmpUrl = res.rtmpUrl;
+      acc.streamKey = res.streamKey || '';
+      acc.roomId = res.roomId || '';
+      saveState();
+      if (state.currentRoute === 'mobile') render();
+      showToast('推流码获取成功（' + (res.via || 'API 通道') + '），可直接开始推流', 'success');
+      addLog((acc.roomName || ('房间 ' + acc.id)) + (acc.name ? ' @' + acc.name : '') + ' 推流码获取成功(' + (res.via || 'API') + '): ' + res.rtmpUrl);
+      // v1.12.48 自动开播：画面编辑无视频层时自动使用默认素材循环播放，保证拿码后必然自动推流
+      // v1.14.10 修复：默认素材不再写死用户桌面路径（换电脑失效）→ 从 软件数据目录\默认素材 动态查找，没有则提示手动选择
+      const sc = getScene(id) || { layers: [] };
+      let hasVideoLayer = (sc.layers || []).some(l => l.type === 'video' && l.filePath);
+      if (!hasVideoLayer) {
+        const defs = await (window.api.listDefaultVideos ? window.api.listDefaultVideos() : Promise.resolve([]));
+        const defVideo = (defs && defs[0]) || '';
+        if (defVideo) {
+          if (!sc.layers) sc.layers = [];
+          sc.layers.push({
+            id: 'auto_' + Date.now(),
+            type: 'video',
+            name: '默认视频',
+            filePath: defVideo,
+            loop: true,
+            volume: 1,
+            x: 0, y: 0, w: 100, h: 100,
+          });
+          saveScene(id, sc);
+          hasVideoLayer = true;
+          addLog('画面编辑暂无视频，已自动添加默认素材（软件数据目录\\默认素材 下第一个视频）');
+        } else {
+          showToast('画面编辑没有视频素材，请在「画面编辑」里选择视频（或把素材放到 软件数据目录\\默认素材 文件夹）', 'warning');
+        }
+      }
+      if (hasVideoLayer) {
+        // v1.13.0 修复：不再自动开始推流（v1.12.48 自动开播在手机断网前就推 → duplicate → FFmpeg 退出 → 推流码被清空）
+        // 正确时序：抓码 → 手机断网（勿点End，房间保留）→ 点「开始内置推流」→ 软件用当场码接管（观众看软件画面）
+        addLog('推流码已就绪：手机断网后点「开始内置推流」接管（观众看软件画面）');
+        showToast('推流码已就绪：手机断网后点「开始内置推流」', 'info');
+      } else {
+        addLog('画面编辑暂无视频，请在画面编辑中添加视频后点「开始内置推流」');
+      }
+    } else {
+      // v1.12.33 不再自动打开 LIVE Studio（手机直播模式无推流码按钮，白等）；主进程已内置 CDP 捕获重试 2 轮，重试即可
+      addLog('房间' + id + ' 推流码获取失败（' + ((res && res.error) || '未知错误') + '），请重新点击「获取推流码」重试（软件会自动重试捕获手机直播间推流码）');
+      showToast('推流码获取失败，请重新点击「获取推流码」重试', 'warning');
+    }
+  });
+}
+
+// v1.12.34 签名服务配置（抖歪同款：RapidAPI 签名 → Node 直连拿推流码不被风控）
+// v1.14.7 内置签名：默认已内置 4k版 RapidAPI 签名，新账号/新电脑无需配置；Key 留空 = 继续用内置
+function signerConfig(id) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (!acc) return;
+  const cfg = (acc.signer) || {};
+  if (!cfg.apiKey) {
+    const useBuiltin = confirm('当前使用内置签名服务（RapidAPI，无需配置）。\n\n确定要自定义签名服务吗？（点「取消」保持内置）');
+    if (!useBuiltin) {
+      showToast('继续使用内置签名服务', 'info');
+      addLog('房间' + id + ' 使用内置签名服务（无需配置）');
+      window.tkAPI.signerCheck({ accountId: id }).then(r => {
+        if (r && r.success) addLog('房间' + id + ' 内置签名检测通过：' + r.message);
+        else addLog('房间' + id + ' 内置签名检测失败：' + ((r && r.error) || '未知'));
+      });
+      return;
+    }
+  }
+  const baseUrl = prompt('签名服务地址（默认 RapidAPI 抖歪同款服务，一般不用改）：', cfg.baseUrl || 'https://tiktok-live-studio-api-signer1.p.rapidapi.com/');
+  if (baseUrl === null) return;
+  const apiKey = prompt('RapidAPI Key（留空 = 恢复使用内置签名）：', cfg.apiKey || '');
+  if (apiKey === null) return;
+  const authMode = prompt('鉴权方式（header=X-RapidAPI-Key / bearer=Authorization，默认 header）：', cfg.authMode || 'header');
+  if (authMode === null) return;
+  if (!apiKey.trim()) {
+    // v1.14.7 Key 留空：清除自定义，恢复内置签名
+    acc.signer = {};
+    saveState();
+    showToast('已恢复使用内置签名服务', 'info');
+    addLog('房间' + id + ' 已恢复内置签名服务');
+    window.tkAPI.signerSave({ accountId: id, baseUrl: '', apiKey: '', authMode: 'header' }).then(r => {
+      if (r && r.success) addLog('房间' + id + ' 内置签名配置已保存');
+    });
+    refreshSignerBadges();
+    return;
+  }
+  acc.signer = { baseUrl: baseUrl.trim(), apiKey: apiKey.trim(), authMode: (authMode.trim() || 'header') };
+  saveState();
+  showToast('签名服务配置已保存，正在检测连通性...', 'info');
+  window.tkAPI.signerSave({ accountId: id, baseUrl: acc.signer.baseUrl, apiKey: acc.signer.apiKey, authMode: acc.signer.authMode }).then(r => {
+    if (r && r.success) addLog('房间' + id + ' 签名服务配置已保存');
+    else addLog('房间' + id + ' 签名服务保存失败：' + ((r && r.error) || '未知'));
+  });
+  window.tkAPI.signerCheck({ accountId: id }).then(r => {
+    if (r && r.success) { addLog('房间' + id + ' 签名服务检测通过：' + r.message); showToast('签名服务检测通过，获取推流码将走签名通道（不被风控）', 'success'); }
+    else { addLog('房间' + id + ' 签名服务检测失败：' + ((r && r.error) || '未知错误')); showToast('签名服务检测失败：' + ((r && r.error) || '请核对 Key'), 'warning'); }
+  });
+}
+
+// v1.6.4 重新获取推流码：清空旧码后走 API 重新获取（不被 getStreamKey 的已持有拦截）
+function regetStreamKey(id) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (!acc) return;
+  if (acc.streaming) { showToast('请先停止推流，再重新获取推流码', 'warning'); return; }
+  if (!acc.loggedIn) { showToast('请先登录该房间（Cookie 登录）', 'error'); return; }
+  acc.rtmpUrl = '';
+  acc.streamKey = '';
+  acc.roomId = '';
+  acc.status = 'idle';
+  saveState();
+  render();
+  showToast('正在重新获取推流码（清空旧推流码）...', 'info');
+  addLog('重新获取推流码: 房间' + id + (acc.name ? ' @' + acc.name : '') + '（已清空旧码）');
+  fetchStreamKeyViaApi(id);
+}
+
+// 等待该房间拿到推流码（轮询 state，超时返回 false）
+function waitStreamKey(accountId, timeoutMs) {
+  return new Promise((resolve) => {
+    const t0 = Date.now();
+    const iv = setInterval(() => {
+      const a = state.accounts.find(x => String(x.id) === String(accountId));
+      if (a && a.streamKey) { clearInterval(iv); resolve(true); }
+      else if (Date.now() - t0 > timeoutMs) { clearInterval(iv); resolve(false); }
+    }, 1000);
+  });
+}
+
+// 确保房间已有推流码：没有则优先 API 通道自动获取；失败再打开直播中心页面扫描兜底
+async function ensureStreamKey(acc, timeoutMs) {
+  if (acc.streamKey) return true;
+  if (!acc.loggedIn) { showToast('请先登录该房间', 'error'); return false; }
+  if (isElectron && window.tkAPI) {
+    addLog('自动获取推流码(API通道): 房间' + acc.id);
+    showToast('正在通过 API 通道自动获取推流码...', 'info');
+    try {
+      const res = await window.tkAPI.getStreamKeyByApi({ accountId: acc.id, accountName: acc.name });
+      if (res && res.success && res.rtmpUrl) {
+        acc.status = 'connected';
+        acc.rtmpUrl = res.rtmpUrl;
+        acc.streamKey = res.streamKey || '';
+        acc.roomId = res.roomId || '';
+        saveState();
+        showToast('推流码已自动获取（API 通道）', 'success');
+        addLog('房间' + acc.id + ' 推流码已自动获取(API通道)');
+        if (state.currentRoute === 'mobile') render();
+        return true;
+      }
+      addLog('房间' + acc.id + ' API通道失败（' + ((res && res.error) || '未知错误') + '），切换页面扫描通道...');
+    } catch (e) { addLog('房间' + acc.id + ' API通道异常: ' + e.message); }
+    // 兜底：页面扫描通道
+    showToast('API 通道暂不可用，打开直播中心自动抓取...', 'warning');
+    window.tkAPI.openProducerWindow({ accountId: acc.id, accountName: acc.name, mode: 'mobile', autoClose: true });
+    const got = await waitStreamKey(acc.id, timeoutMs || 60000); // v1.15.0 页面兜底等待 120 秒 → 60 秒（快速失败，不白等）
+    if (got) {
+      showToast('推流码已自动获取', 'success');
+      addLog('房间' + acc.id + ' 推流码已自动获取');
+    } else {
+      showToast('未获取到推流码：请在直播中心窗口选择手机直播并点「获取推流码」', 'error');
+      addLog('房间' + acc.id + ' 等待推流码超时，请手动在直播中心操作');
+    }
+    return got;
+  }
+  return false;
+}
+
+// ============================================================
+// Electron 真实推流集成
+// ============================================================
+const streamFrameIntervals = {};  // accountId -> interval
+
+async function startRealStream(acc) {
+  if (!isElectron) {
+    showToast('当前为网页预览版，推流需使用桌面版', 'warning');
+    return false;
+  }
+
+  // 检查FFmpeg
+  const ffmpegStatus = await window.tkAPI.checkFFmpeg();
+  if (!ffmpegStatus.available) {
+    showToast('未检测到FFmpeg，请先安装并添加到系统PATH', 'error');
+    addLog('推流失败：未检测到FFmpeg');
+    return false;
+  }
+
+  // 解析推流地址（只使用真实抓取到的推流码，无任何预置地址）
+  const streamInfo = (acc.streamKey || '').trim();
+  let rtmpUrl = (acc.rtmpUrl || '').trim();
+  let streamKey = streamInfo;
+
+  if (!rtmpUrl || !streamKey) {
+    showToast('缺少推流码：请先获取手机直播推流码', 'error');
+    addLog('推流失败：未获取到手机直播推流码');
+    return false;
+  }
+
+  // 如果推流码包含完整URL，解析出来
+  if (streamInfo.startsWith('rtmp://') || streamInfo.startsWith('rtmps://')) {
+    const lastSlash = streamInfo.lastIndexOf('/');
+    if (lastSlash > 8) {
+      rtmpUrl = streamInfo.substring(0, lastSlash);
+      streamKey = streamInfo.substring(lastSlash + 1);
+    }
+  }
+
+  // 如果用户手动输入了完整的推流地址（包含服务器和密钥），尝试解析
+  if (streamInfo.includes('rtmp') && streamInfo.includes('stream-')) {
+    const parts = streamInfo.split(/\s+/);
+    for (const p of parts) {
+      if (p.startsWith('rtmp')) rtmpUrl = p;
+      else if (p.startsWith('stream-')) streamKey = p;
+    }
+  }
+
+  if (!rtmpUrl || !streamKey) {
+    showToast('推流码不完整：请重新获取手机直播推流码', 'error');
+    addLog('推流失败：推流码不完整');
+    return false;
+  }
+
+  // v1.12.52 推流素材优先用"选择视频"按钮选的视频；没有则用画面编辑器的视频图层
+  const sceneVideos = (getScene(acc.id) || { layers: [] }).layers || [];
+  const videoFilePaths = acc.pushVideo ? [acc.pushVideo] : sceneVideos.filter(l => l.type === 'video' && l.filePath).map(l => l.filePath);
+
+  const result = await window.tkAPI.startStream({
+    accountId: acc.id,
+    rtmpUrl: rtmpUrl,
+    streamKey: streamKey,
+    videoFilePaths: videoFilePaths,
+    roomId: acc.roomId || '',
+  });
+
+  if (!result.success) {
+    showToast('推流启动失败: ' + result.error, 'error');
+    addLog('推流失败: ' + result.error);
+    return false;
+  }
+
+  // v1.13.12 立即试探推流（不再固定等待）：duplicate（手机推流权未释放）时主进程自动 10 秒重试，前端按钮显示"推流重试中…"
+  acc.retrying = false;
+  acc.delayed = false;
+  acc.delayedUntil = null;
+  saveState();
+  render();
+
+  // 启动帧推送
+  startFramePushing(acc.id);
+
+  // 监听推流日志
+  if (!window._streamLogBound) {
+    window.tkAPI.onStreamLog(({ accountId, log }) => {
+      if (log.includes('error') || log.includes('Error')) {
+        console.warn('[FFmpeg]', log.trim());
+      }
+      // v1.13.12 推流启动（含 duplicate 自动重试成功）→ 切回"停止推流"并恢复帧推送
+      if (log.includes('推流已启动')) {
+        const a = state.accounts.find(x => String(x.id) === String(accountId));
+        if (a) {
+          a.retrying = false;
+          a.delayed = false;
+          a.streaming = true;
+          a.status = 'live';
+          if (!a.liveStartedAt) a.liveStartedAt = Date.now();
+          startFramePushing(accountId);
+          saveState(); render();
+        }
+      }
+    });
+    window.tkAPI.onStreamError(({ accountId, error }) => {
+      const a = state.accounts.find(x => String(x.id) === String(accountId));
+      if (a) { a.delayed = false; a.delayedUntil = null; a.retrying = false; saveState(); }
+      addLog('推流错误: ' + error);
+      showToast('推流出错: ' + error, 'error');
+    });
+    window.tkAPI.onStreamStopped(({ accountId, code, duplicate, retrying }) => {
+      const a = state.accounts.find(x => String(x.id) === String(accountId));
+      if (a) {
+        a.streaming = false;
+        a.delayed = false; // v1.13.11 自动推流被取消/结束 → 清等待状态
+        a.delayedUntil = null;
+        // v1.13.12 duplicate 自动重试中：按钮切"推流重试中…(点击取消)"，不弹失败长提示
+        if (retrying) {
+          a.retrying = true;
+          a.status = 'connected';
+          stopFramePushing(accountId);
+          saveState(); render();
+          return;
+        }
+        a.retrying = false;
+        a.status = 'connected';
+        stopFramePushing(accountId);
+        // v1.15.0 手机下播自动检测停止 → 前端同步清空推流码（主进程已清，双端一致）
+        if (data.autoDown) {
+          a.streamKey = ''; a.rtmpUrl = ''; a.roomId = '';
+          addLog((a.roomName || ('房间 ' + a.id)) + ' 已识别手机端下播：推流码已清空');
+          saveState();
+          if (state.currentRoute === 'mobile') render();
+          return;
+        }
+        // v1.13.8 推流结束/掉流 → 明确失败原因，码保留显示（便于判断），不静默清空
+        let why = '推流已结束';
+        if (duplicate) why = '推流被服务器拒绝（duplicate：同房间已有手机推流，手机断网后平台未释放推流权）。请等待 30-60 秒让平台释放推流权（或确认手机已完全断网），再重新获取当场新码后重试';
+        else if (code === 4294957243 || code === -10053) why = '推流被服务器中止（连接断开：手机断网后房间可能已被平台结束，或网络波动；请确认另一设备是否仍能看到直播间，若已结束请重新开播抓当场新码）';
+        else if (code === 4294967295 || code === -1) why = '推流异常退出（服务器关闭连接或素材解码错误）';
+        if (a.streamKey) {
+          addLog((a.roomName || ('房间 ' + a.id)) + ' ' + why + '（推流码保留显示，重推请重新获取当场新码）');
+          showToast(why, 'error');
+        } else {
+          addLog((a.roomName || ('房间 ' + a.id)) + ' ' + why);
+        }
+        saveState();
+        if (state.currentRoute === 'mobile') render();
+      }
+    });
+    window._streamLogBound = true;
+  }
+
+  return true;
+}
+
+function startFramePushing(accountId) {
+  stopFramePushing(accountId);
+  let frameCount = 0;
+  // 画面编辑引擎会持续把该房间的图层（视频/图片）渲染到离屏画布，
+  // 这里始终从离屏画布取帧，保证无论停留在哪个页面，推流画面都是画面编辑输出
+  streamFrameIntervals[accountId] = setInterval(async () => {
+    const canvas = getOffscreenCanvas(accountId);
+    if (!canvas) return;
+    try {
+      // 用JPEG压缩减少IPC数据量
+      const jpegUrl = canvas.toDataURL('image/jpeg', 0.75);
+      const base64 = jpegUrl.split(',')[1];
+      await window.tkAPI.pushFrame({ accountId, frameData: base64 });
+      frameCount++;
+    } catch (e) {
+      console.warn('帧推送失败:', e.message);
+    }
+  }, 66); // ~15fps
+}
+
+function stopFramePushing(accountId) {
+  if (streamFrameIntervals[accountId]) {
+    clearInterval(streamFrameIntervals[accountId]);
+    delete streamFrameIntervals[accountId];
+  }
+}
+
+async function stopRealStream(accountId) {
+  if (isElectron) {
+    await window.tkAPI.stopStream({ accountId });
+  }
+  stopFramePushing(accountId);
+}
+
+function toggleStream(id) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (!acc) return;
+  // v1.14.13 启动互斥（前端）：startRealStream 异步期间（等推流码/主进程启动 FFmpeg）按钮锁定，防止连点产生多路并发推流互相杀
+  if (acc.starting) return;
+  // v1.13.12 推流重试阶段：点击 = 取消重试（主进程已清除重试链）
+  if (acc.retrying && !acc.streaming) {
+    if (window.tkAPI) window.tkAPI.stopStream({ accountId: id }).catch(() => {});
+    acc.retrying = false;
+    saveState(); render();
+    addLog((acc.roomName || ('房间 ' + id)) + ' 已取消推流重试');
+    showToast('已取消推流重试', 'info');
+    return;
+  }
+  // v1.13.11 兼容旧等待态（不应出现，兜底清理）
+  if (acc.delayed && !acc.streaming) {
+    if (window.tkAPI) window.tkAPI.stopStream({ accountId: id }).catch(() => {});
+    acc.delayed = false; acc.delayedUntil = null;
+    saveState(); render();
+    return;
+  }
+  if (acc.streaming) {
+    stopRealStream(id);
+    acc.streaming = false;
+    acc.status = 'connected';
+    acc.liveStartedAt = null;
+    // v1.12.44 停止推流/下播后清空推流码：下次开播必须重新获取（每次直播用当场新码，不用旧码）
+    acc.streamKey = '';
+    showToast('已停止推流（推流码已清空，下次开播自动重新获取）', 'info');
+    addLog((acc.roomName || ('房间 ' + acc.id)) + ' 已停止推流（推流码已清空，下次开播自动重新获取新码）');
+    saveState();
+    render();
+    return;
+  }
+  const roomLabel = acc.roomName || ('房间 ' + acc.id);
+  showConfirmModal('开始内置推流（手机流接管）', roomLabel + (acc.name ? ' @' + acc.name : '') + '\n手机流接管流程：\n1. 手机先开播（Device camera）\n2. 点「获取推流码」拿到本场当场码\n3. 点「开始内置推流」→ 立即手机断网/飞行模式（勿点End，房间保留）\n4. 软件立即尝试推流；若手机推流权未释放会自动重试（10 秒一次，最多 6 次），成功即观众看软件画面\n\n重试期间按钮显示「推流重试中…(点击取消)」可取消。手机恢复网络会被顶回（平台机制）。没有推流码时会自动获取。', async () => {
+    if (acc.starting) return; // v1.14.13 二次保险：确认回调里也判锁
+    acc.starting = true; // v1.14.13 启动锁：按钮切"正在启动…"禁用，防止连点
+    saveState(); render();
+    try {
+      // 自动确保推流码（未登录会提示登录）
+      const hasKey = await ensureStreamKey(acc, 90000);
+      if (!hasKey) { acc.starting = false; saveState(); render(); return; }
+      const ok = await startRealStream(acc);
+      acc.starting = false;
+      if (ok) {
+        acc.streaming = true;
+        acc.status = 'live';
+        acc.liveStartedAt = Date.now();
+        saveState();
+        render();
+        showToast('推流已启动（FFmpeg）', 'success');
+        addLog(roomLabel + ' 开始内置推流');
+      } else {
+        saveState(); render();
+      }
+    } catch (e) {
+      acc.starting = false;
+      saveState(); render();
+      addLog(roomLabel + ' 推流启动异常: ' + e.message);
+    }
+  });
+}
+
+function reconnectAccount(id) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (!acc) return;
+  showToast('正在重新连接...', 'info');
+  acc.status = 'connected';
+  saveState();
+  render();
+  addLog('账号 ' + acc.name + ' 重新连接成功');
+}
+
+// v1.9.0 自动互动配置：改完同步到 accounts.json（主进程自动互动引擎读取）
+function syncAutoConfig(id) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (!acc || !acc.name) return;
+  saveState();
+  if (window.tkAPI && window.tkAPI.syncAutoConfig) {
+    window.tkAPI.syncAutoConfig({ accountId: id, autoInteract: acc.autoInteract }).catch(() => {});
+  }
+}
+function toggleAutoInteract(id, enabled) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (acc) {
+    acc.autoInteract.enabled = enabled;
+    syncAutoConfig(id);
+    addLog('账号 ' + acc.name + ' 自动互动:' + (enabled ? '已开启' : '已关闭') + (enabled ? '（感谢+欢迎+智能回复，间隔25s保护）' : ''));
+    showToast('自动互动已' + (enabled ? '开启' : '关闭'), 'success');
+    // v1.13.0 同步智能回复面板内的开关状态文字
+    const st = document.getElementById('aiState');
+    if (st) { st.textContent = enabled ? '已开启' : '未开启'; st.style.color = enabled ? '#047857' : 'var(--text-tertiary)'; }
+  }
+}
+
+function setInteractLang(id, lang) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (acc) {
+    acc.autoInteract.lang = lang;
+    syncAutoConfig(id);
+  }
+}
+
+function toggleColdStart(id, enabled) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (acc) {
+    acc.autoInteract.coldStart = enabled;
+    syncAutoConfig(id);
+    addLog('账号 ' + acc.name + ' 冷启动:' + (enabled ? '已开启' : '已关闭') + (enabled ? '（开播就绪后随机发3条欢迎语）' : ''));
+  }
+}
+
+function setWelcomeMsg(id, msg) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (acc) {
+    acc.autoInteract.welcomeMsg = msg;
+  }
+}
+
+function saveAccountConfig(id) {
+  saveState();
+  syncAutoConfig(id);
+  showToast('配置已保存', 'success');
+  addLog('账号配置已保存（自动互动/冷启动/回复规则）');
+}
+
+function clearFeed(id) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (acc) {
+    acc.feed = [];
+    saveState();
+    render();
+  }
+}
+
+// ============================================================
+// 智能回复助手（本地规则生成，零外部依赖）
+// ============================================================
+const REPLY_TEMPLATES = {
+  '英语(美区)': {
+    price: [
+      'Thanks for asking! DM me and I can share the details \u{1F4AC}',
+      'Price is on the link in my bio \u2014 check it out! \u{1F517}',
+      'Great question! Tap the link in bio for pricing \u{1F64C}',
+    ],
+    link: [
+      'The link is in my bio \u2014 click it and it will take you right there \u{1F517}',
+      'Yes! You can find it in the link in my bio \u2728',
+      'DM me and I will send you the link right away \u{1F4AC}',
+    ],
+    shipping: [
+      'We ship worldwide! Details are in the link in bio \u{1F4E6}',
+      'Usually 5\u20137 days to most countries! \u{1F30D}',
+      'Shipping info is on the link in my bio, check it out \u{1F69A}',
+    ],
+    praise: [
+      'So happy you love it! Thank you for watching \u{1F496}',
+      'You made my day! Stay tuned for more \u{1F970}',
+      'Thank you! More exciting stuff is coming soon \u2728',
+    ],
+    size: [
+      'It comes in several sizes \u2014 see the link in bio for the size chart \u{1F4CF}',
+      'Good question! Sizes are listed in the link in my bio \u{1F44D}',
+    ],
+    general: [
+      'Thanks for the comment! Feel free to ask me anything \u{1F64C}',
+      'Love having you here! Follow for more updates \u2728',
+      'Great to see you in the live! Stay tuned \u{1F389}',
+    ],
+  },
+  '中文': {
+    price: ['感谢提问！私信我告诉你详情 \u{1F4AC}', '价格在简介链接里，点进去就能看到 \u{1F517}', '好问题！点简介链接查看价格 \u{1F64C}'],
+    link: ['链接在简介里，点进去就能找到 \u{1F517}', '有的！简介链接就是它 \u2728', '私信我，马上把链接发给你 \u{1F4AC}'],
+    shipping: ['全球发货！详情见简介链接 \u{1F4E6}', '一般 5\u20137 天到大部分国家 \u{1F30D}', '物流信息在简介链接里 \u{1F69A}'],
+    praise: ['太开心你喜欢！感谢观看 \u{1F496}', '你让我今天超开心！记得蹲后续 \u{1F970}', '谢谢！更多精彩马上来 \u2728'],
+    size: ['有好几个尺码，简介链接里有尺码表 \u{1F4CF}', '好问题！尺码在简介链接里 \u{1F44D}'],
+    general: ['谢谢评论！有问题随时问我 \u{1F64C}', '欢迎常来！点个关注不迷路 \u2728', '看到你真开心，继续蹲直播 \u{1F389}'],
+  },
+};
+
+function generateReplySuggestions(comment, lang) {
+  const c = (comment || '').toLowerCase();
+  const t = REPLY_TEMPLATES[lang] || REPLY_TEMPLATES['英语(美区)'];
+  let pool = t.general;
+  if (/(price|cost|how much|\$|多少钱|价格|价位)/.test(c)) pool = t.price;
+  else if (/(where.*buy|link|链接|哪里买|购买|shop|store)/.test(c)) pool = t.link;
+  else if (/(ship|deliver|物流|发货|邮)/.test(c)) pool = t.shipping;
+  else if (/(love|great|amazing|nice|wow|cute|喜欢|好看|可爱|棒)/.test(c)) pool = t.praise;
+  else if (/(size|尺码|号码|颜色|color)/.test(c)) pool = t.size;
+  return pool.slice(0, 3);
+}
+
+window._lastReplies = [];
+
+// v1.9.0 智能回复助手：自动回复规则编辑器（命中自动回复）+ 手动测试发送
+function showReplyAssistant(id) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (!acc) return;
+  if (!acc.autoInteract) acc.autoInteract = { enabled: false, lang: 'english', replyRules: [] }; // v1.12.16 旧数据兜底（缺失时按钮点击报错无反应）
+  if (!acc.autoInteract.replyRules) acc.autoInteract.replyRules = [];
+  const rules = acc.autoInteract.replyRules;
+  showModal((acc.roomName || ('房间 ' + id)) + (acc.name ? ' @' + acc.name : '') + ' · 智能回复助手', `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer">
+        <input type="checkbox" id="autoInteractEnable" ${acc.autoInteract.enabled ? 'checked' : ''} onchange="toggleAutoInteract(${id}, this.checked)" style="width:15px;height:15px;cursor:pointer">
+        开启自动互动（收到评论自动回复）
+      </label>
+      <span id="aiState" style="font-size:11px;${acc.autoInteract.enabled ? 'color:#047857' : 'color:var(--text-tertiary)'}">${acc.autoInteract.enabled ? '已开启' : '未开启'}</span>
+    </div>
+    <div style="font-size:12px;color:var(--text-secondary);line-height:1.7;margin-bottom:10px">
+      开启「自动互动」后：只在观众<b style="color:var(--text-primary)">点赞 / 送礼物 / 评论@主播 / 命中自定义关键词</b> 时自动回复感谢；进场、普通评论、关注不主动回复（话术不密集）。自动回复有 25 秒间隔保护，避免刷屏。以下规则随账号保存。
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <input class="input" id="ruleKw" placeholder="关键词（如 price / 价格 / link）" style="flex:1.2;height:36px">
+      <input class="input" id="ruleReply" placeholder="回复内容" style="flex:2;height:36px">
+      <button class="btn btn-primary btn-sm" onclick="addReplyRule(${id})">添加</button>
+    </div>
+    <div id="ruleList" style="max-height:150px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
+      ${rules.length ? rules.map((r, i) => `
+        <div style="display:flex;align-items:center;gap:8px;background:var(--surface-hover);border:1px solid var(--border-light);border-radius:8px;padding:7px 10px">
+          <span class="status-tag" style="font-size:11px;flex-shrink:0">${escapeHtml(r.keyword)}</span>
+          <span style="flex:1;font-size:12px;color:var(--text-secondary);word-break:break-all">${escapeHtml(r.reply)}</span>
+          <button class="mon-panel-icon" style="flex-shrink:0" onclick="removeReplyRule(${id}, ${i})" title="删除">&times;</button>
+        </div>`).join('') : '<div style="font-size:12px;color:var(--text-tertiary);text-align:center;padding:10px">还没有规则，先添加一条试试</div>'}
+    </div>
+    <div style="border-top:1px solid var(--border-light);padding-top:12px">
+      <div style="font-size:12px;font-weight:600;margin-bottom:8px">手动测试（一键发送到直播间）</div>
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <input class="input" id="replyCommentInput" placeholder="输入或粘贴一条观众评论" style="flex:1;height:36px">
+        <select class="select" id="replyLangSelect" style="width:150px;height:36px">
+          ${Object.keys(REPLY_TEMPLATES).map(l => `<option ${acc.autoInteract.lang === l ? 'selected' : ''}>${l}</option>`).join('')}
+        </select>
+      </div>
+      <button class="btn btn-primary" style="width:100%" onclick="generateReplies(${id})">生成推荐回复</button>
+      <div id="replyResult" style="margin-top:10px"></div>
+    </div>
+  `, [
+    { text: '在直播间回复', class: 'btn-secondary', action: () => {
+      if (isElectron && window.tkAPI) window.tkAPI.openLiveWindow({ accountId: id, accountName: acc.name });
+      closeModal();
+    }},
+    { text: '关闭', class: 'btn-secondary' },
+  ], 'monitor-modal');
+}
+
+function addReplyRule(id) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (!acc) return;
+  const kw = document.getElementById('ruleKw')?.value?.trim();
+  const rp = document.getElementById('ruleReply')?.value?.trim();
+  if (!kw || !rp) { showToast('关键词和回复都要填', 'error'); return; }
+  if (!acc.autoInteract.replyRules) acc.autoInteract.replyRules = [];
+  acc.autoInteract.replyRules.push({ keyword: kw.slice(0, 40), reply: rp.slice(0, 200) });
+  saveAccountConfig(id);
+  addLog('房间' + id + ' 新增回复规则: 「' + kw + '」');
+  showReplyAssistant(id);
+}
+function removeReplyRule(id, idx) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (!acc || !acc.autoInteract.replyRules) return;
+  acc.autoInteract.replyRules.splice(idx, 1);
+  saveAccountConfig(id);
+  addLog('房间' + id + ' 已删除回复规则');
+  showReplyAssistant(id);
+}
+
+function generateReplies(id) {
+  const comment = document.getElementById('replyCommentInput')?.value?.trim();
+  if (!comment) { showToast('请先输入评论内容', 'error'); return; }
+  const lang = document.getElementById('replyLangSelect')?.value || '英语(美区)';
+  const suggestions = generateReplySuggestions(comment, lang);
+  window._lastReplies = suggestions;
+  const html = `
+    <div style="font-size:12px;font-weight:600;margin-bottom:6px">推荐回复（${lang}）</div>
+    ${suggestions.map((s, i) => `
+      <div style="display:flex;align-items:center;gap:8px;background:var(--surface-hover);border:1px solid var(--border-light);border-radius:8px;padding:8px 10px;margin-bottom:6px">
+        <span style="flex:1;font-size:12px;line-height:1.5;word-break:break-word">${escapeHtml(s)}</span>
+        <button class="btn btn-secondary btn-sm" style="flex-shrink:0" onclick="sendReplyNow(${id}, ${i})">发送到直播间</button>
+        <button class="btn btn-ghost btn-sm" style="flex-shrink:0" onclick="copyReply(${i})">复制</button>
+      </div>
+    `).join('')}
+  `;
+  document.getElementById('replyResult').innerHTML = html;
+  addLog('智能回复已生成（' + lang + '）');
+}
+
+function sendReplyNow(id, i) {
+  const text = (window._lastReplies && window._lastReplies[i]) || '';
+  if (!text) return;
+  doSendComment(id, text);
+}
+
+function copyReply(i) {
+  const text = (window._lastReplies && window._lastReplies[i]) || '';
+  if (!text) return;
+  navigator.clipboard?.writeText(text).catch(() => {});
+  showToast('回复已复制', 'success');
+}
+
+// v1.13.0 推流引擎选择（FFmpeg=内置直推已验证；OBS=内置便携OBS，用于多素材/滤镜合成或FFmpeg不稳时）
+function setStreamEngine(id, v) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (!acc) return;
+  acc.useOBS = (v === 'obs');
+  saveState();
+  render();
+  addLog('账号 ' + acc.name + ' 推流引擎: ' + (acc.useOBS ? 'OBS(内置便携,隐藏运行)' : 'FFmpeg(内置直推)'));
+  showToast(acc.useOBS ? '已切换到 OBS 引擎（内置便携，隐藏运行；需选视频素材）' : '已切换到 FFmpeg 引擎（内置直推）', 'info');
+}
+
+// v1.12.52 选择推流视频素材（手机流接管时观众看到此视频；同步加入画面编辑器图层互通）
+async function choosePushVideo(id) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (!acc) return;
+  try {
+    const path = await window.tkAPI.openFile([{ name: '视频文件', extensions: ['mp4', 'mov', 'mkv', 'avi', 'flv', 'webm'] }]);
+    if (path && typeof path === 'string') {
+      acc.pushVideo = path;
+      // 互通：同步加入画面编辑器视频图层（画面编辑里也能看到/管理该素材）
+      const sc = getScene(id);
+      if (!sc.layers) sc.layers = [];
+      sc.layers = sc.layers.filter(l => !String((l && l.id) || '').startsWith('push_'));
+      const layerId = 'push_' + Date.now();
+      const newLayer = {
+        id: layerId, type: 'video', name: '推流素材',
+        filePath: path, loop: true, volume: 1, playing: true,
+        x: 0, y: 0, width: 720, height: 1280,
+        rotation: 0, flipH: false, flipV: false,
+      };
+      sc.layers.push(newLayer);
+      sc.selectedLayerId = layerId;
+      // 同步创建视频元素（画面编辑/推流渲染依赖 videoElements[layer.id]，缺失会黑屏）
+      const video = document.createElement('video');
+      video.src = 'file://' + path.replace(/\\/g, '/').replace(/ /g, '%20').replace(/#/g, '%23');
+      video.crossOrigin = 'anonymous';
+      video.loop = true;
+      video.muted = true;
+      video.volume = 1;
+      video.play().catch(() => { video.muted = true; video.play().catch(() => {}); });
+      videoElements[layerId] = video;
+      video.onloadedmetadata = () => {
+        const ratio = video.videoWidth / video.videoHeight;
+        if (ratio > 720 / 1280) {
+          newLayer.width = 720; newLayer.height = 720 / ratio; newLayer.y = (1280 - newLayer.height) / 2;
+        } else {
+          newLayer.height = 1280; newLayer.width = 1280 * ratio; newLayer.x = (720 - newLayer.width) / 2;
+        }
+        if (state.currentRoute === 'editor') render();
+      };
+      video.onerror = () => {
+        showToast('推流视频无法解码：' + path.split(/[\\/]/).pop() + '，请换用 H.264 编码的 MP4', 'error');
+        addLog('推流视频解码失败: ' + path);
+      };
+      saveScene(id, sc);
+      saveState();
+      render();
+      startCanvasEngine();
+      showToast('已选择推流素材并加入画面编辑: ' + path.split(/[\\/]/).pop(), 'success');
+      addLog('账号 ' + acc.name + ' 已选择推流素材（已同步画面编辑）: ' + path);
+    }
+  } catch (e) { showToast('选择视频失败: ' + e.message, 'error'); }
+}
+
+function openEditor(id) {
+  state.editingAccountId = id;
+  state.currentRoute = 'editor';
+  saveState();
+  render();
+  addLog('打开画面编辑器: ' + (state.accounts.find(a => String(a.id) === String(id))?.name || ''));
+}
+
+function switchEditorRoom(id) {
+  state.editingAccountId = id;
+  saveState();
+  render();
+}
+
+function showStreamKey(id) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (!acc || !acc.streamKey) return;
+  showModal('推流信息', `
+    <div style="font-size:13px;line-height:1.8">
+      <div style="margin-bottom:12px">
+        <div style="font-weight:600;margin-bottom:4px">服务器:</div>
+        <div style="font-family:var(--mono);font-size:12px;color:var(--text-secondary);word-break:break-all">rtmps://push-rtmp-f5-tt03.fcdn.eu.tiktokcdn.com:443/stage</div>
+      </div>
+      <div>
+        <div style="font-weight:600;margin-bottom:4px">推流码:</div>
+        <div style="font-family:var(--mono);font-size:12px;color:var(--text-secondary);word-break:break-all">${acc.streamKey}</div>
+      </div>
+    </div>
+  `, [{ text: '复制完整地址', class: 'btn-primary', action: () => { copyStreamKey(id); closeModal(); } }, { text: '关闭', class: 'btn-secondary' }]);
+}
+
+function copyStreamKey(id) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (!acc || !acc.streamKey) return;
+  const full = 'rtmps://push-rtmp-f5-tt03.fcdn.eu.tiktokcdn.com:443/stage/' + acc.streamKey;
+  navigator.clipboard?.writeText(full).catch(() => {});
+  showToast('推流地址已复制到剪贴板', 'success');
+}
+
+// ============================================================
+// 节点操作
+// ============================================================
+function showNodeManager() {
+  navigate('nodes');
+}
+
+function addNode(test) {
+  const name = document.getElementById('newNodeName')?.value?.trim() || '';
+  const url = document.getElementById('newNodeUrl')?.value?.trim() || '';
+  if (!url) {
+    showToast('请输入节点链接', 'error');
+    return;
+  }
+  const type = url.startsWith('vless') ? 'vless' : (url.startsWith('vmess') ? 'vmess' : 'socks5');
+  const nodeName = name || ('节点' + state.nextNodeId + ' · ' + type.toUpperCase());
+  const node = {
+    id: state.nextNodeId++,
+    name: nodeName,
+    type: type,
+    url: url,
+    status: 'disconnected',
+    testResult: '',
+    assignedAccounts: 0,
+  };
+  state.nodes.push(node);
+  saveState();
+  syncNodesToMain(); // v1.13.11 同步到主进程 nodes.json（重启后软件自起内置 xray 代理）
+  render();
+  showToast('节点已添加', 'success');
+  addLog('添加节点: ' + nodeName);
+  if (test) {
+    doTestNode(node);
+  }
+}
+
+// v1.13.11 节点同步到主进程（内置 xray 代理使用第一个节点）
+async function syncNodesToMain() {
+  if (isElectron && window.tkAPI && window.tkAPI.saveNodes) {
+    try { await window.tkAPI.saveNodes({ nodes: state.nodes.map(n => ({ id: n.id, name: n.name, link: n.url })) }); } catch (e) {}
+  }
+}
+
+async function doTestNode(node) {
+  node.status = 'testing';
+  node.testResult = '';
+  saveState();
+  render();
+  addLog('测试节点: ' + node.name);
+  if (isElectron && window.tkAPI) {
+    const res = await window.tkAPI.testNode({ url: node.url });
+    if (res && res.success) {
+      node.status = 'connected';
+      node.ip = res.ip || 'unknown';
+      node.ping = res.ping || 0;
+      node.downMBps = res.downMBps || 0;
+      node.upMBps = res.upMBps || 0;
+      node.testResult = '';
+      showToast('节点测试通过 · 出口 ' + node.ip + ' · 延迟 ' + node.ping + ' ms · 下行 ' + node.downMBps + ' MB/s', 'success');
+      addLog('节点 ' + node.name + ' 测试通过，出口 IP: ' + node.ip + '，延迟 ' + node.ping + ' ms，下行 ' + node.downMBps + ' MB/s，上行 ' + node.upMBps + ' MB/s');
+    } else {
+      node.status = 'error';
+      node.testResult = (res && res.error) || '测试失败';
+      node.ip = '';
+      node.ping = 0;
+      node.downMBps = 0;
+      node.upMBps = 0;
+      showToast('节点测试失败: ' + (res && res.error), 'error');
+      addLog('节点 ' + node.name + ' 测试失败: ' + (res && res.error));
+    }
+  } else {
+    node.status = 'error';
+    node.testResult = '仅桌面版支持真实测试';
+    showToast('仅桌面版支持真实节点测试', 'warning');
+  }
+  saveState();
+  render();
+}
+
+function testNode(id) {
+  const node = state.nodes.find(n => n.id === id);
+  if (!node) return;
+  if (node.status === 'testing') return;
+  doTestNode(node);
+}
+
+// v1.14.7 测试全部节点（逐节点真实测速：出口 IP / 延迟 / 下行 / 上行），完成后弹窗汇总
+async function testAllNodes() {
+  if (!state.nodes.length) { showToast('暂无节点', 'warning'); return; }
+  if (state.nodes.some(n => n.status === 'testing')) { showToast('已有节点在测试中，请稍候', 'warning'); return; }
+  showToast('开始测试全部 ' + state.nodes.length + ' 个节点（每个约 10-20 秒）...', 'info');
+  addLog('开始测试全部节点 (' + state.nodes.length + ' 个)');
+  const rows = [];
+  for (const n of [...state.nodes]) {
+    await doTestNode(n);
+    rows.push({ name: n.name, ok: n.status === 'connected', ip: n.ip || '', ping: n.ping || 0, down: n.downMBps || 0, up: n.upMBps || 0, error: n.status === 'error' ? (n.testResult || '失败') : '' });
+  }
+  const okCount = rows.filter(r => r.ok).length;
+  const html = rows.map(r => `
+    <div style="padding:8px 0;border-bottom:1px solid var(--border-light);font-size:12px;line-height:1.8">
+      <div style="font-weight:700">${escapeHtml(r.name)} <span style="color:${r.ok ? '#2ea043' : '#f85149'}">${r.ok ? '✅ 可用' : '❌ 不可用'}</span></div>
+      <div style="color:var(--text-secondary)">${r.ok ? ('出口 ' + escapeHtml(r.ip) + ' · 延迟 ' + r.ping + ' ms · 下行 ' + r.down + ' MB/s · 上行 ' + r.up + ' MB/s') : escapeHtml(r.error)}</div>
+    </div>`).join('');
+  showModal('节点测试结果（' + okCount + '/' + rows.length + ' 可用）', html, [{ text: '关闭', class: 'btn-secondary' }]);
+}
+
+function editNode(id) {
+  const node = state.nodes.find(n => n.id === id);
+  if (!node) return;
+  showModal('编辑节点', `
+    <div class="form-group">
+      <label class="form-label">节点名称</label>
+      <input class="form-input" id="editNodeName" value="${node.name}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">节点链接</label>
+      <input class="form-input" id="editNodeUrl" value="${node.url}">
+    </div>
+  `, [
+    { text: '保存', class: 'btn-primary', action: () => {
+      node.name = document.getElementById('editNodeName').value.trim() || node.name;
+      node.url = document.getElementById('editNodeUrl').value.trim() || node.url;
+      node.status = 'disconnected';
+      node.testResult = '';
+      saveState();
+      render();
+      closeModal();
+      showToast('节点已更新，请重新测试', 'info');
+    }},
+    { text: '取消', class: 'btn-secondary' }
+  ]);
+}
+
+function deleteNode(id) {
+  const node = state.nodes.find(n => n.id === id);
+  if (!node) return;
+  showConfirmModal('删除节点', '确定要删除节点「' + node.name + '」吗？此操作无法撤销，已分配该节点的账号将变为未分配状态。', () => {
+    state.nodes = state.nodes.filter(n => n.id !== id);
+    state.accounts.forEach(a => { if (a.nodeId === id) a.nodeId = null; });
+    saveState();
+    render();
+    showToast('节点已删除', 'success');
+    addLog('删除节点: ' + node.name);
+  });
+}
+
+function assignNodeToAccount(accId, nodeId) {
+  const acc = state.accounts.find(a => String(a.id) === String(accId));
+  if (acc) {
+    acc.nodeId = nodeId ? parseInt(nodeId) : null;
+  }
+}
+
+function saveAssignment(accId) {
+  const acc = state.accounts.find(a => String(a.id) === String(accId));
+  if (acc) {
+    state.nodes.forEach(n => n.assignedAccounts = state.accounts.filter(a => a.nodeId === n.id).length);
+    saveState();
+    render();
+    showToast('节点分配已保存', 'success');
+    addLog('账号 ' + acc.name + ' 节点分配已更新');
+  }
+}
+
+function addPartnerNode(test) {
+  showToast('伴侣流功能开发中', 'info');
+}
+
+// ============================================================
+// 账号管理弹窗
+// ============================================================
+function showAddAccount() {
+  showModal('添加房间 / 账号', `
+    <div class="form-group">
+      <label class="form-label">房间名称</label>
+      <input class="form-input" id="newRoomName" placeholder="例如: 房间 5" autofocus>
+    </div>
+    <div class="form-group">
+      <label class="form-label">TikTok 账号名（不带 @，可稍后填写）</label>
+      <input class="form-input" id="newAccountName" placeholder="例如: username">
+    </div>
+    <div class="form-group">
+      <label class="form-label">分配节点（可选）</label>
+      <select class="select" style="width:100%;height:42px" id="newAccountNode">
+        <option value="">暂不分配</option>
+        ${state.nodes.map(n => `<option value="${n.id}">${n.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-desc">每个房间拥有完全独立的 Cookie 会话与独立窗口，一个房间一个号。</div>
+  `, [
+    { text: '添加房间', class: 'btn-primary', action: () => {
+      const roomName = document.getElementById('newRoomName').value.trim();
+      const name = document.getElementById('newAccountName').value.trim();
+      const nodeId = document.getElementById('newAccountNode').value;
+      const newId = state.nextAccountId++;
+      const acc = {
+        id: newId,
+        roomName: roomName || ('房间 ' + newId),
+        name: name,
+        nodeId: nodeId ? parseInt(nodeId) : null,
+        status: 'disconnected',
+        loggedIn: false,
+        cookieInfo: null,
+        streaming: false,
+        streamKey: '',
+        rtmpUrl: '',
+        metrics: { online: 0, likes: 0, gifts: 0, follows: 0, enters: 0, comments: 0 },
+        monitorRunning: false,
+        roomId: '',
+        autoInteract: { enabled: false, lang: '英语(美区)', coldStart: false, welcomeMsg: '欢迎来到直播间。喜欢的朋友可以点个关注。有问题欢迎留言。', replyRules: [] },
+        risks: [],
+        feed: [],
+      };
+      state.accounts.push(acc);
+      if (nodeId) {
+        state.nodes.forEach(n => n.assignedAccounts = state.accounts.filter(a => a.nodeId === n.id).length);
+      }
+      saveState();
+      render();
+      closeModal();
+      showToast('房间已添加', 'success');
+      addLog('添加房间: ' + acc.roomName + (name ? ' @' + name : ''));
+    }},
+    { text: '取消', class: 'btn-secondary' }
+  ]);
+}
+
+function showSavedAccounts() {
+  const savedList = state.accounts.map((a, i) => `
+    <div class="assign-row" style="padding:10px 0">
+      <div class="assign-account">
+        <div class="idx">${a.roomName || ('房间 ' + a.id)}</div>
+        <div class="name">${a.loggedIn ? '✓ 已登录' : '未登录'}${a.name ? ' · @' + a.name : ''}</div>
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="deleteAccount(${a.id})">清除</button>
+    </div>
+  `).join('');
+
+  showModal('使用已保存账号', `
+    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">选择要加入「手机流开播」的账号。复用已保存登录，单独配置画面。</div>
+    <div class="form-group">
+      <label class="form-label">账号</label>
+      <select class="select" style="width:100%;height:42px" id="savedAccountSelect">
+        <option value="">请选择账号</option>
+        ${state.accounts.map(a => `<option value="${a.id}">@${a.name}</option>`).join('')}
+      </select>
+    </div>
+    <div style="margin-top:16px;border-top:1px solid var(--border-light);padding-top:16px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:10px;cursor:pointer;display:flex;align-items:center;gap:6px" onclick="document.getElementById('savedList').style.display=document.getElementById('savedList').style.display==='none'?'block':'none'">
+        <span>▼</span> 管理已保存账号
+      </div>
+      <div id="savedList">${savedList || '<div style="font-size:12px;color:var(--text-tertiary);padding:10px 0">暂无已保存账号</div>'}</div>
+    </div>
+  `, [
+    { text: '添加到当前页面', class: 'btn-primary', action: () => {
+      const id = document.getElementById('savedAccountSelect').value;
+      if (!id) { showToast('请选择账号', 'error'); return; }
+      closeModal();
+      showToast('账号已添加到开播页面', 'success');
+      addLog('已保存账号已添加到开播页面');
+    }},
+    { text: '取消', class: 'btn-secondary' }
+  ]);
+}
+
+function deleteAccount(id) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (!acc) return;
+  closeModal();
+  showConfirmModal('清除这个账号?', (acc.roomName || ('房间 ' + id)) + (acc.name ? ' @' + acc.name : '') + '\n该房间的 Cookie 登录态、独立窗口、画面配置将全部清理，相关推流会停止。\n此操作无法撤销，其他房间不受影响。', () => {
+    state.accounts = state.accounts.filter(a => String(a.id) !== String(id));
+    state.nodes.forEach(n => n.assignedAccounts = state.accounts.filter(a => a.nodeId === n.id).length);
+    if (isElectron && window.tkAPI) {
+      window.tkAPI.clearLogin({ accountId: id });
+      window.tkAPI.closeAccountWindows({ accountId: id });
+    }
+    saveState();
+    render();
+    showToast('账号已清除', 'success');
+    addLog('清除账号: 房间' + id + (acc.name ? ' @' + acc.name : ''));
+  });
+}
+
+// ============================================================
+// 实时监控弹窗（v1.8.0：IM 互动数据 + 风险告警）
+// ============================================================
+function toggleMonitor(id) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (!acc) return;
+  if (acc.monitorRunning) {
+    if (window.tkAPI && window.tkAPI.stopMonitor) window.tkAPI.stopMonitor({ accountId: id });
+    acc.monitorRunning = false;
+    addLog('房间' + id + (acc.name ? ' @' + acc.name : '') + ' 实时监控已停止');
+  } else {
+    if (!acc.name) {
+      showToast('请先登录账号并确认账号名后再开启监控', 'error');
+      return;
+    }
+    if (!window.tkAPI || !window.tkAPI.startMonitor) {
+      showToast('当前为非桌面环境，无法开启监控', 'error');
+      return;
+    }
+    acc.monitorRunning = true;
+    saveState();
+    render();
+    // v1.11.0 不再内嵌弹窗：监控窗口为独立窗口（可拖出软件页面外），主界面只聚焦它
+    if (window.tkAPI && window.tkAPI.monitorFocusUI) window.tkAPI.monitorFocusUI({ accountId: id });
+    addLog('房间' + id + (acc.name ? ' @' + acc.name : '') + ' 正在启动实时监控（IM互动+风险扫描）...');
+    window.tkAPI.startMonitor({ accountId: id, accountName: acc.name }).then(r => {
+      if (r && r.success) {
+        acc.monitorRunning = true;
+        if (window.tkAPI && window.tkAPI.monitorFocusUI) window.tkAPI.monitorFocusUI({ accountId: id });
+        addLog('房间' + id + ' 实时监控已开启' + (r.roomId ? '，直播间 ' + r.roomId : '') + '（独立监控窗口已弹出，可拖出软件页面）');
+      } else {
+        acc.monitorRunning = false;
+        addLog('房间' + id + ' 监控启动失败: ' + (r && r.error ? r.error : '未知错误'));
+      }
+      saveState();
+      render();
+      updateMonitorPanel(id);
+    });
+  }
+  saveState();
+  render();
+}
+
+// ============================================================
+// v1.9.0 每房间独立监控弹窗（实时动态+互动计数+风险告警合一）
+// 每个房间一个独立浮动面板，多房间可同时打开，各自独立数据
+// ============================================================
+const monitorPanels = {};  // accountId -> { el, minimized }
+
+// v1.9.2 直播时长格式化
+function formatLiveDuration(sec) {
+  if (!sec || sec < 0) return '--:--';
+  sec = Math.floor(sec);
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  const pad = n => String(n).padStart(2, '0');
+  return (h > 0 ? pad(h) + ':' : '') + pad(m) + ':' + pad(s);
+}
+// v1.9.2 每1秒刷新所有已打开监控面板的直播时长
+function startLiveTicker() {
+  if (window._liveTicker) return;
+  window._liveTicker = setInterval(() => {
+    Object.keys(monitorPanels).forEach(idStr => {
+      const id = Number(idStr);
+      const acc = state.accounts.find(a => String(a.id) === String(id));
+      const node = monitorPanels[id] && monitorPanels[id].el.querySelector('#mpx-live-' + id);
+      if (!node) return;
+      if (acc && acc.streaming && acc.liveStartedAt) {
+        node.textContent = formatLiveDuration((Date.now() - acc.liveStartedAt) / 1000);
+        node.style.color = '#047857';
+      } else {
+        node.textContent = '--:--';
+        node.style.color = 'var(--text-secondary)';
+      }
+    });
+  }, 1000);
+}
+// v1.9.2 复制观众直播间链接（@user/live 会自动跳转到软件推流的当前直播间）
+function copyLiveLink(id) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (!acc || !acc.name) { showToast('该房间未登录，无法生成链接', 'error'); return; }
+  const url = 'https://www.tiktok.com/@' + acc.name + '/live';
+  const done = () => { showToast('观众链接已复制：' + url, 'success'); addLog('房间' + id + ' 已复制观众链接 ' + url); };
+  // v1.12.16 file:// 下 navigator.clipboard 可能挂起（promise 不回调→看起来没反应）：包裹 try 并兜底 fallbackCopy
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(done).catch(() => { fallbackCopy(url); done(); });
+    } else { fallbackCopy(url); done(); }
+  } catch (e) { fallbackCopy(url); done(); }
+}
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); } catch (e) {}
+  document.body.removeChild(ta);
+}
+
+function openMonitorPanel(id) {
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (!acc) return;
+  const container = document.getElementById('monitorPanels');
+  if (monitorPanels[id]) { monitorPanels[id].el.classList.remove('minimized'); monitorPanels[id].el.style.display = 'flex'; updateMonitorPanel(id); return; }
+  const el = document.createElement('div');
+  el.className = 'mon-panel';
+  el.id = 'mon-panel-' + id;
+  const idx = state.accounts.findIndex(a => String(a.id) === String(id));
+  el.style.top = (90 + (idx % 5) * 46) + 'px';
+  el.style.right = (16 + (idx % 5) * 26) + 'px';
+  el.innerHTML = `
+    <div class="mon-panel-header" id="mon-head-${id}">
+      <span class="mon-panel-title"><span class="dot" id="mon-dot-${id}"></span>${escapeHtml(acc.roomName || ('房间' + id))}${acc.name ? ' @' + escapeHtml(acc.name) : ''}</span>
+      <span class="mon-panel-live" id="mpx-live-${id}">--:--</span>
+      <button class="mon-panel-icon" onclick="toggleMinMonitor(${id})" title="最小化/展开">&minus;</button>
+      <button class="mon-panel-icon" onclick="closeMonitorPanel(${id})" title="关闭">&times;</button>
+    </div>
+    <div class="mon-panel-body">
+      <div class="mon-panel-metrics">
+        <div class="monitor-metric"><div class="v" id="mpx-online-${id}">0</div><div class="l">在线</div></div>
+        <div class="monitor-metric"><div class="v" id="mpx-likes-${id}">0</div><div class="l">点赞</div></div>
+        <div class="monitor-metric"><div class="v" id="mpx-gifts-${id}">0</div><div class="l">礼物</div></div>
+        <div class="monitor-metric"><div class="v" id="mpx-follows-${id}">0</div><div class="l">关注</div></div>
+        <div class="monitor-metric"><div class="v" id="mpx-enters-${id}">0</div><div class="l">进场</div></div>
+        <div class="monitor-metric"><div class="v" id="mpx-comments-${id}">0</div><div class="l">评论</div></div>
+      </div>
+      <!-- v1.12.5 去掉直播画面小电视（实时画面延迟高、卡顿，观众画面请用「打开直播间」） -->
+      <div style="font-size:12px;font-weight:600">实时动态</div>
+      <div class="mon-panel-feed" id="mpx-feed-${id}"><div class="feed-empty">暂无实时动态<br><span style="font-size:11px">进场、评论、礼物都会显示在这里</span></div></div>
+      <!-- v1.14.11 风险告警记录面板已移除（功能停用） -->
+      <div class="mon-panel-actions">
+        <button class="btn btn-sm ${acc.monitorRunning ? 'btn-danger' : 'btn-success'}" onclick="toggleMonitorFromPanel(${id})" id="mpx-btn-${id}">${acc.monitorRunning ? '停止监控' : '开启监控'}</button>
+        <button class="btn btn-sm btn-ghost" onclick="openLiveWindow(${id})">打开直播间</button>
+        <button class="btn btn-sm btn-ghost" onclick="copyLiveLink(${id})">观众链接</button>
+        <button class="btn btn-sm btn-ghost" onclick="showReplyAssistant(${id})">智能回复</button>
+      </div>
+      <div class="mon-quick">
+        <span class="q" onclick="sendQuickComment(${id}, 'Welcome! ❤️')">Welcome! ❤️</span>
+        <span class="q" onclick="sendQuickComment(${id}, 'Thanks for watching! ❤️')">Thanks for watching!</span>
+        <span class="q" onclick="sendQuickComment(${id}, '感谢观看！')">感谢观看！</span>
+        <span class="q" onclick="sendQuickComment(${id}, '欢迎来到直播间！')">欢迎来到直播间！</span>
+      </div>
+      <div class="mon-panel-send">
+        <input id="mpx-input-${id}" placeholder="手动发送一条评论（测试/互动）" onkeydown="if(event.key==='Enter')sendPanelComment(${id})">
+        <button class="btn btn-sm btn-primary" onclick="sendPanelComment(${id})">发送</button>
+      </div>
+    </div>
+  `;
+  container.appendChild(el);
+  monitorPanels[id] = { el, minimized: false };
+  // 拖拽
+  const head = el.querySelector('.mon-panel-header');
+  head.addEventListener('mousedown', (e) => {
+    if (e.target.closest('.mon-panel-icon')) return;
+    const rect = el.getBoundingClientRect();
+    const startX = e.clientX, startY = e.clientY, origX = rect.left, origY = rect.top;
+    const onMove = (ev) => { el.style.right = 'auto'; el.style.left = Math.max(0, origX + ev.clientX - startX) + 'px'; el.style.top = Math.max(0, origY + ev.clientY - startY) + 'px'; };
+    const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+  updateMonitorPanel(id);
+}
+
+function toggleMinMonitor(id) {
+  const p = monitorPanels[id];
+  if (!p) return;
+  p.minimized = !p.minimized;
+  p.el.classList.toggle('minimized', p.minimized);
+}
+function closeMonitorPanel(id) {
+  const p = monitorPanels[id];
+  if (!p) return;
+  p.el.remove();
+  delete monitorPanels[id];
+}
+function toggleMonitorFromPanel(id) {
+  toggleMonitor(id);
+}
+
+function updateMonitorPanel(id) {
+  const p = monitorPanels[id];
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  if (!p || !acc) return;
+  const el = p.el;
+  const m = acc.metrics;
+  ['online','likes','gifts','follows','enters','comments'].forEach(k => {
+    const node = el.querySelector('#mpx-' + k + '-' + id);
+    if (node) node.textContent = formatNum(m[k] || 0);
+  });
+  const dot = el.querySelector('#mon-dot-' + id);
+  if (dot) dot.className = 'dot' + (acc.monitorRunning ? ' live' : '');
+  const btn = el.querySelector('#mpx-btn-' + id);
+  if (btn) { btn.textContent = acc.monitorRunning ? '停止监控' : '开启监控'; btn.className = 'btn btn-sm ' + (acc.monitorRunning ? 'btn-danger' : 'btn-success'); }
+  const feed = el.querySelector('#mpx-feed-' + id);
+  if (feed && feed.dataset.initialized !== '1') {
+    feed.dataset.initialized = '1';
+    feed.innerHTML = (acc.feed && acc.feed.length) ? acc.feed.slice(-30).reverse().map(feedItemHtml).join('') : '<div class="feed-empty">暂无实时动态<br><span style="font-size:11px">进场、评论、礼物、风险告警都会显示在这里</span></div>';
+  }
+  const risk = el.querySelector('#mpx-risk-' + id);
+  if (risk && risk.dataset.initialized !== '1') {
+    risk.dataset.initialized = '1';
+    risk.innerHTML = (acc.risks && acc.risks.length) ? acc.risks.slice(-10).reverse().map(riskItemHtml).join('') : '<div class="mon-panel-empty-note">暂无风险告警</div>';
+  }
+}
+
+function feedItemHtml(item) {
+  return `<div class="feed-item"><span class="feed-type ${item.type}">${typeLabel(item.type)}</span><div class="feed-content">${item.user ? '<span class="feed-user">' + escapeHtml(item.user) + '</span> ' : ''}<span class="feed-text">${escapeHtml(item.text || '')}</span></div></div>`;
+}
+function riskItemHtml(r) {
+  const cls = r.severity === 'high' ? ' high' : '';
+  return `<div class="mon-risk-item${cls}"><span class="t">${escapeHtml(r.cn || '风险告警')}</span> · ${escapeHtml((r.detail || '').slice(0, 60))}<div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">${new Date(r.ts || Date.now()).toLocaleTimeString()} ${escapeHtml((r.advice || '').slice(0, 40))}</div></div>`;
+}
+
+function appendPanelFeed(id, item) {
+  const p = monitorPanels[id];
+  if (!p) return;
+  const feed = p.el.querySelector('#mpx-feed-' + id);
+  if (!feed) return;
+  const empty = feed.querySelector('.feed-empty');
+  if (empty) feed.innerHTML = '';
+  const div = document.createElement('div');
+  div.innerHTML = feedItemHtml(item);
+  feed.insertBefore(div.firstChild, feed.firstChild);
+  while (feed.children.length > 50) feed.removeChild(feed.lastChild);
+}
+
+function appendPanelRisk(id, risk) {
+  const p = monitorPanels[id];
+  if (!p) return;
+  const box = p.el.querySelector('#mpx-risk-' + id);
+  if (!box) return;
+  const empty = box.querySelector('.mon-panel-empty-note');
+  if (empty) box.innerHTML = '';
+  const div = document.createElement('div');
+  div.innerHTML = riskItemHtml(risk);
+  box.insertBefore(div.firstChild, box.firstChild);
+  while (box.children.length > 20) box.removeChild(box.lastChild);
+}
+
+// 手动发送评论（面板输入框 / 快捷短语）
+function sendPanelComment(id) {
+  const input = document.getElementById('mpx-input-' + id);
+  const text = input && input.value.trim();
+  if (!text) { showToast('请输入评论内容', 'error'); return; }
+  doSendComment(id, text, input);
+}
+function sendQuickComment(id, text) { doSendComment(id, text); }
+function doSendComment(id, text, input) {
+  if (!window.tkAPI || !window.tkAPI.sendLiveComment) { showToast('桌面环境才支持发评论', 'error'); return; }
+  window.tkAPI.sendLiveComment({ accountId: id, text }).then(r => {
+    if (r && r.ok) { addLog('房间' + id + ' 已发送评论: ' + text); showToast('评论已发送', 'success'); if (input) input.value = ''; }
+    else { addLog('房间' + id + ' 评论发送失败: ' + ((r && r.reason) || '未知')); showToast('发送失败: ' + ((r && r.reason) || '监控未开启'), 'error'); }
+  });
+}
+
+function showMonitor(id) {
+  // v1.11.0 主界面"打开监控"：聚焦独立监控窗口（未创建则提示先开启监控）
+  if (window.tkAPI && window.tkAPI.monitorFocusUI) window.tkAPI.monitorFocusUI({ accountId: id });
+}
+function toggleMonitorFromModal(id) { toggleMonitorFromPanel(id); }
+
+// v1.8.0：IM 互动事件（主进程推送）
+function handleImEvents(data) {
+  // v1.13.17 String 兼容 id 匹配（主进程 accountId 为字符串，state.accounts id 可能被解析为数字 → 匹配失败 → 面板永不更新）
+  const acc = state.accounts.find(a => String(a.id) === String(data.accountId));
+  if (!acc) {
+    try { addLog('[实时动态] 房间' + data.accountId + ' 未找到账号卡片（id=' + data.accountId + ' 类型匹配失败）'); } catch (e) {}
+    return;
+  }
+  // v1.13.16 强诊断：前端收到事件立即记日志（软件日志面板可见，定位"主进程推了但面板不显示"）
+  try { addLog('[实时动态] 房间' + data.accountId + ' 收到 ' + (data.items || []).length + ' 条: ' + (data.items || []).map(i => i.type + ':' + (i.user || '') + (i.text ? ':' + i.text.slice(0, 20) : '')).join(', ')); } catch (e) {}
+  // v1.15.31 在线每次实时更新：DOM 在线源已干净（room-header 门控 + 直播已结束全文检测，不再横跳）——观众数变化实时跟随，去掉一次性限制
+  (data.items || []).forEach(item => {
+    acc.feed.push(item);
+    if (acc.feed.length > 200) acc.feed.shift();
+    if (item.type === 'comment') acc.metrics.comments++;
+    else if (item.type === 'like') {
+      // v1.12.30 点赞总数事件（isTotal）直接设为直播间真实点赞数；行为点赞事件按 likeCount 累加
+      // v1.15.32 点赞只增不减（页面重载抓到旧值不回落）：取当前值与新值的较大者
+      if (item.isTotal) acc.metrics.likes = Math.max(acc.metrics.likes || 0, item.likeCount || 0);
+      else acc.metrics.likes += (item.likeCount || 1);
+    }
+    else if (item.type === 'gift') acc.metrics.gifts += (item.giftCount || 1); // v1.13.29 ×N 累加：送 3 个礼物 +3
+    else if (item.type === 'follow') acc.metrics.follows++;
+    else if (item.type === 'enter') acc.metrics.enters++;
+    else if (item.type === 'online') { acc.metrics.online = parseInt(item.text.replace(/[^0-9]/g, '')) || 0; }
+    // v1.9.0 独立面板实时追加（点赞总数事件只更新指标，不进动态流）
+    if (item.type !== 'online' && !item.isTotal) appendPanelFeed(data.accountId, item);
+  });
+  // 在线（主进程 DOM 实时值）：有值就更新（0 也更新——观众走光归 0）
+  if (data.online !== undefined && data.online !== null && data.online !== '') { acc.metrics.online = data.online || 0; }
+  saveState();
+  render();
+  updateMonitorPanel(data.accountId);
+  // v1.9.0 语音播报（礼物/关注/评论，评论节流）
+  const items = data.items || [];
+  const talk = items.find(i => i.type === 'gift') || items.find(i => i.type === 'follow');
+  const cmt = items.find(i => i.type === 'comment');
+  if (talk) ttsAnnounce((talk.type === 'gift' ? '礼物 ' : '关注 ') + (talk.user || ''));
+  else if (cmt && state.broadcast) ttsAnnounce((cmt.user ? cmt.user + ' 评论 ' : '评论 ') + cmt.text);
+  const summary = items.map(i => {
+    const who = i.user ? i.user + ' ' : '';
+    if (i.isTotal) return '';
+    if (i.type === 'comment') return '评论 ' + who + (i.text || '');
+    if (i.type === 'gift') return '礼物 ' + who + (i.text || '');
+    if (i.type === 'enter') return '进场 ' + who;
+    if (i.type === 'follow') return '关注 ' + who;
+    if (i.type === 'online') return i.text;
+    return i.type + (i.text ? ' ' + i.text : '');
+  }).filter(Boolean).join('；');
+  if (summary) addLog('房间' + data.accountId + ' ' + summary);
+}
+
+// v1.8.0：风险告警（主进程推送，官方通道分类）
+// v1.14.11 风险告警已停用（用户反馈数据不准确、误报多）：主进程不再发送，此处直接忽略（保留函数以防将来恢复）
+function handleRiskWarning(data) {
+  return;
+  // ---------- 以下为原逻辑（已停用）----------
+  const acc = state.accounts.find(a => String(a.id) === String(data.accountId));
+  const risk = data.risk || {};
+  const sevColor = risk.severity === 'high' ? 'var(--danger,#ef4444)' : '#f59e0b';
+  const msg = '房间' + data.accountId + (acc && acc.name ? ' @' + acc.name : '') + ' 风险告警: ' + (risk.cn || '未知风险');
+  addLog('[风险] ' + msg);
+  if (acc) {
+    acc.feed.push({ type: 'risk', user: '', text: (risk.cn || '风险告警') + ' · ' + (risk.detail || ''), ts: Date.now() });
+    if (acc.feed.length > 200) acc.feed.shift();
+    if (!acc.risks) acc.risks = [];
+    acc.risks.push(Object.assign({ ts: Date.now() }, risk));
+    if (acc.risks.length > 50) acc.risks.shift();
+    saveState();
+    render();
+    appendPanelFeed(data.accountId, acc.feed[acc.feed.length - 1]);
+    appendPanelRisk(data.accountId, acc.risks[acc.risks.length - 1]);
+    // v1.9.0 风险语音播报（高危必播，中等节流）
+    ttsAnnounce('风险告警：' + (risk.cn || '直播状态异常') + '。' + (risk.advice || ''), risk.severity === 'high');
+  }
+  // 弹窗提示（原因+建议+严重级）
+  showModal('⚠ ' + (risk.cn || '风险告警'), `
+    <div style="font-size:13px;line-height:1.7">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+        <span class="status-tag" style="background:${sevColor}20;color:${sevColor};border-color:${sevColor}55">${risk.severity === 'high' ? '高风险' : '中等风险'}</span>
+        <span style="font-size:11px;color:var(--text-tertiary)">${new Date().toLocaleTimeString()} · 房间${data.accountId}${acc && acc.name ? ' @' + acc.name : ''}</span>
+      </div>
+      <div class="form-label" style="color:${sevColor};font-size:14px;margin-bottom:4px">${risk.cn || '直播状态异常'}</div>
+      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:10px">${risk.detail || ''}</div>
+      <div style="background:var(--surface-hover);border-radius:8px;padding:10px;font-size:12px;color:var(--text-secondary)">
+        <b style="color:var(--text-primary)">建议：</b>${risk.advice || ''}
+      </div>
+      ${data.page && data.page.title ? '<div style="margin-top:10px;font-size:11px;color:var(--text-tertiary)">页面标题: ' + escapeHtml(data.page.title) + '</div>' : ''}
+    </div>
+  `, [{ text: '知道了', class: 'btn-success' }], 'monitor-modal');
+}
+
+// v1.12.43 手机下播提醒（醒目横幅 + 蜂鸣；不抢其他程序焦点）
+let phoneDownAccountId = 5;
+function handlePhoneDownRemind(data) {
+  const banner = document.getElementById('phoneDownBanner');
+  if (!banner) return;
+  if (data && data.accountId) phoneDownAccountId = data.accountId;
+  if (data && data.done) {
+    banner.style.display = 'none';
+    showToast(data.msg || '手机直播间已下播，单端达成', 'success');
+    return;
+  }
+  const acc = state.accounts.find(a => String(a.id) === String(data.accountId));
+  document.getElementById('phoneDownMsg').textContent = (data && data.msg) || '⚠️ 请手动在手机端下播（单端接管直播）';
+  banner.style.display = 'block';
+  addLog('[提醒] ' + (data && data.msg || '请手动在手机端下播') + (acc && acc.name ? ' @' + acc.name : ''));
+  // 蜂鸣提醒（不依赖系统音量设置，浏览器音频）
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new Ctx();
+    const o = ctx.createOscillator(); const g = ctx.createGain();
+    o.frequency.value = 880; g.gain.value = 0.25;
+    o.connect(g); g.connect(ctx.destination);
+    o.start(); setTimeout(() => { o.stop(); ctx.close(); }, 900);
+  } catch (e) {}
+}
+function confirmPhoneDown() {
+  const banner = document.getElementById('phoneDownBanner');
+  if (banner) banner.style.display = 'none';
+  if (window.tkAPI && window.tkAPI.phoneDownConfirm) {
+    window.tkAPI.phoneDownConfirm({ accountId: phoneDownAccountId });
+  }
+  addLog('[提醒] 用户已确认手机端下播');
+}
+
+// v1.8.0：监控状态变化
+function handleMonitorState(data) {
+  const acc = state.accounts.find(a => String(a.id) === String(data.accountId));
+  if (!acc) return;
+  acc.monitorRunning = !!data.running;
+  if (data.roomId && data.roomId !== acc.roomId) {
+    acc.roomId = data.roomId;
+    addLog('房间' + data.accountId + ' 当前直播间: ' + data.roomId);
+  }
+  if (data.warning) addLog('房间' + data.accountId + ' ' + data.warning);
+  saveState();
+  render();
+  updateMonitorPanel(data.accountId);
+}
+
+// v1.15.32 只有「停止监控」（reason 含"监控已停止"）才清空数据；下播/结束/切换/房间号变化 → 数据暂停保留（只加不减）
+function handleMonitorCleared(data) {
+  const acc = state.accounts.find(a => String(a.id) === String(data.accountId));
+  if (!acc) return;
+  const reason = String(data.reason || '');
+  if (reason.indexOf('监控已停止') >= 0) {
+    acc.metrics = { online: 0, likes: 0, gifts: 0, follows: 0, enters: 0, comments: 0 };
+    acc._likeUsers = {};
+    acc.feed = [];
+    acc.risks = [];
+    saveState();
+    render();
+    updateMonitorPanel(data.accountId);
+    addLog('房间' + data.accountId + ' ' + (reason || '监控已停止') + '，实时数据已清零');
+  } else {
+    // 下播/结束/切换：数据保留，仅暂停记录（面板数字停住不动，不丢失）
+    // v1.15.34 在线是跟随型数据（跟着观众数实时加减），暂停/下播 → 在线归 0（其余累计型数字保留不动）
+    if (acc.metrics && acc.metrics.online !== 0) {
+      acc.metrics.online = 0;
+      saveState();
+    }
+    updateMonitorPanel(data.accountId);
+    addLog('房间' + data.accountId + ' ' + (reason || '直播状态变化') + '，实时数据已暂停记录（数据保留，仅停止监控时清零）');
+  }
+}
+
+// v1.10.0 直播画面小电视：监控窗口实时画面截图 → 弹窗小电视
+function handleMonitorFrame(data) {
+  const p = monitorPanels[data.accountId];
+  if (!p) return;
+  const img = document.getElementById('mpx-tv-' + data.accountId);
+  const ph = document.getElementById('mpx-tvph-' + data.accountId);
+  if (!img || !data.dataUrl) return;
+  img.src = data.dataUrl;
+  img.style.display = 'block';
+  if (ph) ph.style.display = 'none';
+}
+
+// v1.11.0 独立监控窗口置顶切换（📌 按钮：不被其他界面/弹窗盖住）
+let pinnedMonitors = {};
+function togglePin(id) {
+  const on = !pinnedMonitors[id];
+  pinnedMonitors[id] = on;
+  const btn = document.getElementById('mon-pin-' + id);
+  if (btn) { btn.style.color = on ? '#f59e0b' : ''; btn.style.background = on ? '#fff3e0' : ''; }
+  if (window.tkAPI && window.tkAPI.monitorPin) {
+    window.tkAPI.monitorPin({ accountId: id, on }).then(r => {
+      if (r && r.success) addLog('房间' + id + (on ? ' 已置顶（不被其他窗口盖住）' : ' 已取消置顶'));
+    });
+  }
+}
+
+// v1.10.0 独立监控窗口（可拖出软件页面外）：只渲染监控面板，无主界面
+function initMonitorMode(id) {
+  loadState(); // v1.12.14 确保账户数据加载（智能回复/观众链接等按钮依赖 state.accounts，缺失时点击静默无反应）
+  const acc = state.accounts.find(a => String(a.id) === String(id));
+  // v1.15.26 实时数据从浮窗打开时刻开始记录：清掉 localStorage 恢复的历史 feed/计数（用户"没开播却一堆数据"= 历史数据被恢复显示，非真实数据）
+  if (acc) { acc.feed = []; acc.metrics = { online: 0, likes: 0, gifts: 0, follows: 0, enters: 0, comments: 0 }; }
+  document.body.classList.add('monitor-mode');
+  document.body.innerHTML = '';
+  document.title = (acc ? (acc.roomName || ('房间' + acc.id)) : ('房间' + id)) + ' · 实时监控';
+  const el = document.createElement('div');
+  el.className = 'mon-panel mon-standalone';
+  el.id = 'mon-panel-' + id;
+  const nm = acc ? (acc.roomName || ('房间' + acc.id)) : ('房间' + id);
+  el.innerHTML = `
+    <div class="mon-panel-header" id="mon-head-${id}">
+      <span class="mon-panel-title"><span class="dot" id="mon-dot-${id}"></span>${escapeHtml(nm)}${acc && acc.name ? ' @' + escapeHtml(acc.name) : ''}</span>
+      <span class="mon-panel-live" id="mpx-live-${id}">--:--</span>
+      <button class="mon-panel-icon" id="mon-pin-${id}" onclick="togglePin(${id})" title="置顶窗口（不被其他窗口盖住）">📌</button>
+      <button class="mon-panel-icon" onclick="window.close()" title="关闭窗口">&times;</button>
+    </div>
+    <div class="mon-panel-body">
+      <div class="mon-panel-metrics">
+        <div class="monitor-metric"><div class="v" id="mpx-online-${id}">0</div><div class="l">在线</div></div>
+        <div class="monitor-metric"><div class="v" id="mpx-likes-${id}">0</div><div class="l">点赞</div></div>
+        <div class="monitor-metric"><div class="v" id="mpx-gifts-${id}">0</div><div class="l">礼物</div></div>
+        <div class="monitor-metric"><div class="v" id="mpx-follows-${id}">0</div><div class="l">关注</div></div>
+        <div class="monitor-metric"><div class="v" id="mpx-enters-${id}">0</div><div class="l">进场</div></div>
+        <div class="monitor-metric"><div class="v" id="mpx-comments-${id}">0</div><div class="l">评论</div></div>
+      </div>
+      <!-- v1.12.5 去掉直播画面小电视（实时画面延迟高、卡顿，观众画面请用「打开直播间」） -->
+      <div style="font-size:12px;font-weight:600">实时动态</div>
+      <div class="mon-panel-feed" id="mpx-feed-${id}"><div class="feed-empty">暂无实时动态<br><span style="font-size:11px">进场、评论、礼物都会显示在这里</span></div></div>
+      <!-- v1.14.11 风险告警记录面板已移除（功能停用） -->
+      <div class="mon-panel-actions">
+        <button class="btn btn-sm ${acc.monitorRunning ? 'btn-danger' : 'btn-success'}" onclick="toggleMonitorFromPanel(${id})" id="mpx-btn-${id}">${acc.monitorRunning ? '停止监控' : '开启监控'}</button>
+        <button class="btn btn-sm btn-ghost" onclick="openLiveWindow(${id})">打开直播间</button>
+        <button class="btn btn-sm btn-ghost" onclick="copyLiveLink(${id})">观众链接</button>
+        <button class="btn btn-sm btn-ghost" onclick="showReplyAssistant(${id})">智能回复</button>
+      </div>
+      <div class="mon-quick">
+        <span class="q" data-t="Welcome! ❤️">Welcome! ❤️</span>
+        <span class="q" data-t="Thanks for watching! ❤️">Thanks for watching!</span>
+        <span class="q" data-t="感谢观看！">感谢观看！</span>
+        <span class="q" data-t="欢迎来到直播间！">欢迎来到直播间！</span>
+      </div>
+      <div class="mon-panel-send">
+        <input id="mpx-input-${id}" placeholder="手动发送一条评论（测试/互动）">
+        <button class="btn btn-sm btn-primary">发送</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(el);
+  // v1.12.16 按钮改用 addEventListener 兜底（内联 onclick 在部分 Electron 场景不触发导致"点了没反应"）
+  const bindBtn = (sel, fn) => { const b = document.querySelector(sel); if (b) b.addEventListener('click', () => { try { fn(); } catch (e) { console.error('[监控弹窗] 按钮错误:', e); } }); };
+  bindBtn('#mpx-btn-' + id, () => toggleMonitorFromPanel(id));
+  bindBtn('#mpx-openlive-' + id, () => openLiveWindow(id));
+  bindBtn('#mpx-copylink-' + id, () => copyLiveLink(id));
+  bindBtn('#mpx-replyasst-' + id, () => showReplyAssistant(id));
+  el.querySelectorAll('.mon-panel-send .btn').forEach(b => b.addEventListener('click', () => { try { sendPanelComment(id); } catch (e) {} }));
+  const mpxInput = document.querySelector('#mpx-input-' + id);
+  if (mpxInput) mpxInput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { try { sendPanelComment(id); } catch (e) {} } });
+  el.querySelectorAll('.mon-quick .q').forEach(q => q.addEventListener('click', () => { const t = q.getAttribute('data-t') || q.textContent.trim(); try { sendQuickComment(id, t); } catch (e) {} }));
+  monitorPanels[id] = { el, minimized: false };
+  updateMonitorPanel(id);
+  startLiveTicker(); // v1.13.0 独立监控窗口补齐直播时长计时（之前只有主界面启动 ticker，导致这里时长一直 "--:--"）
+  // 主进程监控未运行时自动启动
+  if (window.tkAPI && window.tkAPI.monitorStatus) {
+    window.tkAPI.monitorStatus({ accountId: id }).then(r => {
+      if (!r || !r.running) toggleMonitor(id);
+    });
+  }
+}
+
+// v1.9.0 语音播报（TTS，本地合成，不依赖网络）
+const ttsState = { lastTalkTs: 0 };
+function ttsAnnounce(text, force) {
+  if (!state.broadcast && !force) return;
+  try {
+    if (!window.speechSynthesis) return;
+    const now = Date.now();
+    if (!force && now - ttsState.lastTalkTs < 20000) return; // 普通播报 20s 节流
+    ttsState.lastTalkTs = now;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(String(text).slice(0, 120));
+    u.lang = 'zh-CN'; u.rate = 1; u.volume = 0.9;
+    window.speechSynthesis.speak(u);
+  } catch (e) {}
+}
+
+// ============================================================
+// 弹窗系统
+// ============================================================
+function showModal(title, bodyHtml, buttons, extraClass) {
+  // v1.12.17 独立监控窗口无 modalContainer：动态创建（否则 null 报错→智能回复等弹窗无反应）
+  let container = document.getElementById('modalContainer');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'modalContainer';
+    document.body.appendChild(container);
+  }
+  const btns = (buttons || [{ text: '关闭', class: 'btn-secondary' }]).map((b, i) =>
+    `<button class="btn ${b.class}" data-modal-btn="${i}">${b.text}</button>`
+  ).join('');
+
+  container.innerHTML = `
+    <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+      <div class="modal ${extraClass || ''}">
+        <div class="modal-header">
+          <div>
+            <div class="modal-title">${title}</div>
+          </div>
+          <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body">${bodyHtml}</div>
+        <div class="modal-footer">${btns}</div>
+      </div>
+    </div>
+  `;
+
+  // bind buttons
+  container.querySelectorAll('[data-modal-btn]').forEach(btn => {
+    const idx = parseInt(btn.dataset.modalBtn);
+    const action = buttons[idx]?.action;
+    btn.onclick = () => { if (action) action(); else closeModal(); };
+  });
+}
+
+function showConfirmModal(title, message, onConfirm) {
+  showModal(title, `
+    <div style="font-size:14px;line-height:1.7;color:var(--text-primary);white-space:pre-wrap">${message}</div>
+  `, [
+    { text: '确认', class: 'btn-danger', action: () => { closeModal(); onConfirm(); } },
+    { text: '取消', class: 'btn-secondary' },
+  ]);
+}
+
+function closeModal() {
+  const c = document.getElementById('modalContainer'); // v1.12.17 null 保护（独立监控窗口）
+  if (c) c.innerHTML = '';
+}
+
+// ============================================================
+// 播报开关
+// ============================================================
+function toggleBroadcast() {
+  state.broadcast = !state.broadcast;
+  document.getElementById('broadcastText').textContent = '播报:' + (state.broadcast ? '开' : '关');
+  document.getElementById('broadcastDot').style.background = state.broadcast ? 'var(--success)' : 'var(--text-tertiary)';
+  saveState();
+  showToast('语音播报已' + (state.broadcast ? '开启' : '关闭'), 'info');
+  // v1.9.0 播报变真实：开启时试播，关闭时停止
+  if (state.broadcast) {
+    addLog('语音播报已开启：礼物/关注/评论/风险会自动语音提示');
+    ttsAnnounce('语音播报已开启', true);
+  } else {
+    try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) {}
+    addLog('语音播报已关闭');
+  }
+}
+
+// ============================================================
+// 实时数据说明
+// ============================================================
+// 本版本零模拟数据：在线/点赞/礼物/评论等全部等待真实事件。
+// 房间登录后在「打开直播间」的独立窗口中查看真实数据，
+// 主界面动态区在接入真实 WebSocket 前保持空（不造假数据）。
+
+// ============================================================
+// Canvas 画面编辑器引擎
+// ============================================================
+const videoElements = {};  // layerId -> video element
+const imageElements = {};  // layerId -> image element
+const offscreenCanvases = {}; // accountId -> 离屏输出画布（推流用，不依赖当前页面）
+let canvasRenderRunning = false;
+let lastFrameTime = 0;
+let frameCount = 0;
+let fpsLastUpdate = 0;
+
+function getOffscreenCanvas(accountId) {
+  if (!offscreenCanvases[accountId]) {
+    const c = document.createElement('canvas');
+    c.width = 720;
+    c.height = 1280;
+    offscreenCanvases[accountId] = c;
+  }
+  return offscreenCanvases[accountId];
+}
+
+function triggerFileInput(accId) {
+  // 每个房间使用独立的文件选择 input（避免多房间 id 冲突导致素材加到别的房间）
+  const input = document.getElementById('layerFileInput_' + accId);
+  if (input) input.click();
+}
+
+function handleLayerFileUpload(accId, file) {
+  if (!file) return;
+  const scene = getScene(accId);
+  const isVideo = file.type.startsWith('video/');
+  const url = URL.createObjectURL(file);
+  // 真实文件路径：视频原声推流需要（webUtils.getPathForFile）
+  let filePath = '';
+  try { filePath = window.tkAPI.getPathForFile ? window.tkAPI.getPathForFile(file) : ''; } catch (e) { filePath = ''; }
+  const layerId = state.nextLayerId++;
+
+  const layer = {
+    id: layerId,
+    name: file.name.replace(/\.[^.]+$/, '').substring(0, 20),
+    fileName: file.name,
+    filePath: filePath,
+    type: isVideo ? 'video' : 'image',
+    src: url,
+    x: 0, y: 0,
+    width: 720, height: 1280,
+    rotation: 0,
+    flipH: false, flipV: false,
+    volume: 1,
+    playing: isVideo,
+    loop: true,
+  };
+
+  if (isVideo) {
+    const video = document.createElement('video');
+    video.src = url;
+    video.crossOrigin = 'anonymous';
+    video.loop = true;
+    // 先静音自动播放：绕过自动播放策略，保证视频画面一定能渲染出来
+    video.muted = true;
+    video.volume = layer.volume;
+    video.play().catch(() => { video.muted = true; video.play().catch(() => {}); });
+    videoElements[layerId] = video;
+    video.onloadedmetadata = () => {
+      const ratio = video.videoWidth / video.videoHeight;
+      if (ratio > 720 / 1280) {
+        layer.width = 720;
+        layer.height = 720 / ratio;
+        layer.y = (1280 - layer.height) / 2;
+      } else {
+        layer.height = 1280;
+        layer.width = 1280 * ratio;
+        layer.x = (720 - layer.width) / 2;
+      }
+      if (state.currentRoute === 'editor') render();
+    };
+    video.onerror = () => {
+      showToast('视频文件无法解码：' + file.name + '，请换用 H.264 编码的 MP4', 'error');
+      addLog('视频解码失败: ' + file.name);
+    };
+  } else {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const ratio = img.width / img.height;
+      if (ratio > 720 / 1280) {
+        layer.width = 720;
+        layer.height = 720 / ratio;
+        layer.y = (1280 - layer.height) / 2;
+      } else {
+        layer.height = 1280;
+        layer.width = 1280 * ratio;
+        layer.x = (720 - layer.width) / 2;
+      }
+      if (state.currentRoute === 'editor') render();
+    };
+    img.onerror = () => {
+      showToast('图片文件无法解码：' + file.name, 'error');
+      addLog('图片解码失败: ' + file.name);
+    };
+    img.src = url;
+    imageElements[layerId] = img;
+  }
+
+  scene.layers.push(layer);
+  scene.selectedLayerId = layerId;
+  saveState();
+  render();
+  showToast('素材已添加: ' + layer.name, 'success');
+  addLog('添加素材: ' + file.name + ' (' + (isVideo ? '视频' : '图片') + ')');
+  startCanvasEngine();
+}
+
+function selectLayer(accId, layerId) {
+  const scene = getScene(accId);
+  scene.selectedLayerId = layerId;
+  render();
+}
+
+function updateLayerProp(accId, prop, value) {
+  const scene = getScene(accId);
+  const layer = scene.layers.find(l => l.id === scene.selectedLayerId);
+  if (!layer) return;
+  layer[prop] = value;
+  if (prop === 'volume' && videoElements[layer.id]) {
+    videoElements[layer.id].volume = value;
+  }
+  saveState();
+}
+
+function moveLayer(accId, direction) {
+  const scene = getScene(accId);
+  const idx = scene.layers.findIndex(l => l.id === scene.selectedLayerId);
+  if (idx < 0) return;
+  const newIdx = idx + direction;
+  if (newIdx < 0 || newIdx >= scene.layers.length) return;
+  [scene.layers[idx], scene.layers[newIdx]] = [scene.layers[newIdx], scene.layers[idx]];
+  saveState();
+  render();
+}
+
+function deleteSelectedLayer(accId) {
+  const scene = getScene(accId);
+  const idx = scene.layers.findIndex(l => l.id === scene.selectedLayerId);
+  if (idx < 0) { showToast('请先选择一个图层', 'error'); return; }
+  const layer = scene.layers[idx];
+  if (videoElements[layer.id]) {
+    videoElements[layer.id].pause();
+    videoElements[layer.id].src = '';
+    delete videoElements[layer.id];
+  }
+  if (imageElements[layer.id]) {
+    delete imageElements[layer.id];
+  }
+  scene.layers.splice(idx, 1);
+  scene.selectedLayerId = scene.layers.length > 0 ? scene.layers[scene.layers.length - 1].id : null;
+  saveState();
+  render();
+  showToast('图层已删除', 'info');
+}
+
+function toggleVideoPlay(accId, layerId) {
+  const video = videoElements[layerId];
+  const scene = getScene(accId);
+  const layer = scene.layers.find(l => l.id === layerId);
+  if (!video || !layer) return;
+  if (video.paused) {
+    video.play().catch(() => {});
+    layer.playing = true;
+  } else {
+    video.pause();
+    layer.playing = false;
+  }
+  const btn = document.getElementById('playBtn_' + layerId);
+  if (btn) btn.textContent = layer.playing ? '暂停' : '播放';
+}
+
+function restartVideo(accId, layerId) {
+  const video = videoElements[layerId];
+  if (video) {
+    video.currentTime = 0;
+    video.play().catch(() => {});
+  }
+}
+
+function saveScene(accId) {
+  saveState();
+  showToast('场景已保存', 'success');
+  addLog('画面场景已保存');
+}
+
+function applyToOutput(accId) {
+  const outCanvas = document.querySelector('#outputCanvas_' + accId + ' canvas');
+  if (outCanvas) {
+    const emptyEl = document.getElementById('outputEmpty_' + accId);
+    if (emptyEl) emptyEl.style.display = 'none';
+  }
+  showToast('已应用到输出', 'success');
+  addLog('画面已应用到输出通道');
+}
+
+function setMasterVolume(accId, vol) {
+  const scene = getScene(accId);
+  scene.outputVolume = vol;
+  scene.layers.forEach(l => {
+    if (videoElements[l.id]) {
+      videoElements[l.id].volume = l.volume * vol;
+    }
+  });
+  saveState();
+}
+
+// v1.15.11 滤镜功能已整体下掉（推流加滤镜导致直播间无画面，WebGL 预览黑屏）——全部还原 v1.15.9 之前，无滤镜
+
+function startCanvasEngine() {
+  if (canvasRenderRunning) return;
+  canvasRenderRunning = true;
+  lastFrameTime = performance.now();
+  requestAnimationFrame(canvasRenderLoop);
+}
+
+function canvasRenderLoop(timestamp) {
+  if (!canvasRenderRunning) return;
+
+  // FPS计算
+  frameCount++;
+  if (timestamp - fpsLastUpdate >= 1000) {
+    const fps = Math.round(frameCount * 1000 / (timestamp - fpsLastUpdate) * 10) / 10;
+    document.querySelectorAll('[id^="fps_"]').forEach(el => {
+      el.textContent = fps + ' FPS';
+    });
+    frameCount = 0;
+    fpsLastUpdate = timestamp;
+  }
+
+  // 渲染所有可见的编辑器canvas
+  if (state.currentRoute === 'editor' && state.editingAccountId) {
+    const accId = state.editingAccountId;
+    const scene = getScene(accId);
+
+    // 预览画布
+    const previewCanvas = document.querySelector('#previewCanvas_' + accId + ' canvas');
+    if (previewCanvas) {
+      renderSceneToCanvas(previewCanvas, scene, accId, true);
+    }
+    // 输出画布
+    const outCanvas = document.querySelector('#outputCanvas_' + accId + ' canvas');
+    if (outCanvas) {
+      renderSceneToCanvas(outCanvas, scene, accId, false);
+    }
+  }
+
+  // 渲染所有推流中房间的离屏输出画布（无论当前在哪个页面，推流画面始终是画面编辑内容）
+  state.accounts.forEach(a => {
+    if (a.streaming) {
+      renderSceneToCanvas(getOffscreenCanvas(a.id), getScene(a.id), a.id, false);
+    }
+  });
+
+  lastFrameTime = timestamp;
+  requestAnimationFrame(canvasRenderLoop);
+}
+
+// v1.15.11 滤镜已下掉：预览直接渲染场景（无任何后处理，杜绝黑屏）
+function renderSceneToCanvas(canvas, scene, accId, showSelection) {
+  renderSceneInner(canvas, scene, accId, showSelection);
+}
+
+function renderSceneInner(canvas, scene, accId, showSelection) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width;
+  const H = canvas.height;
+
+  // 清空
+  ctx.fillStyle = '#0f0f1a';
+  ctx.fillRect(0, 0, W, H);
+
+  // 绘制网格背景
+  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += 40) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let y = 0; y < H; y += 40) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  // 按层级绘制图层
+  scene.layers.forEach(layer => {
+    ctx.save();
+
+    // 变换中心
+    const cx = layer.x + layer.width / 2;
+    const cy = layer.y + layer.height / 2;
+    ctx.translate(cx, cy);
+    if (layer.rotation) ctx.rotate(layer.rotation * Math.PI / 180);
+    ctx.scale(layer.flipH ? -1 : 1, layer.flipV ? -1 : 1);
+    ctx.translate(-layer.width / 2, -layer.height / 2);
+
+    // 绘制内容
+    if (layer.type === 'video' && videoElements[layer.id]) {
+      const video = videoElements[layer.id];
+      if (video.readyState >= 2) {
+        ctx.drawImage(video, 0, 0, layer.width, layer.height);
+      }
+    } else if (layer.type === 'image' && imageElements[layer.id] && imageElements[layer.id].complete) {
+      ctx.drawImage(imageElements[layer.id], 0, 0, layer.width, layer.height);
+    } else {
+      // 占位
+      ctx.fillStyle = 'rgba(99,102,241,0.2)';
+      ctx.fillRect(0, 0, layer.width, layer.height);
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = '14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(layer.name, layer.width / 2, layer.height / 2);
+    }
+
+    ctx.restore();
+
+    // 选中框
+    if (showSelection && layer.id === scene.selectedLayerId) {
+      ctx.save();
+      ctx.strokeStyle = '#6366f1';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.strokeRect(layer.x, layer.y, layer.width, layer.height);
+      ctx.setLineDash([]);
+      // 角点 + 边中点（v1.15.30 8 个缩放手柄：角点自由缩放、边中点单方向拉伸 = 随意拉大拉小/拉长拉短）
+      const handles = [
+        [layer.x, layer.y], [layer.x + layer.width, layer.y],
+        [layer.x, layer.y + layer.height], [layer.x + layer.width, layer.y + layer.height],
+        [layer.x + layer.width / 2, layer.y], [layer.x + layer.width / 2, layer.y + layer.height],
+        [layer.x, layer.y + layer.height / 2], [layer.x + layer.width, layer.y + layer.height / 2],
+      ];
+      ctx.fillStyle = '#fff';
+      ctx.strokeStyle = '#6366f1';
+      ctx.lineWidth = 2;
+      handles.forEach(([hx, hy]) => {
+        ctx.fillRect(hx - 5, hy - 5, 10, 10);
+        ctx.strokeRect(hx - 5, hy - 5, 10, 10);
+      });
+      ctx.restore();
+    }
+  });
+}
+
+// 画布拖拽交互
+let dragState = null;
+function setupCanvasDrag() {
+  document.addEventListener('mousedown', (e) => {
+    if (state.currentRoute !== 'editor') return;
+    const previewDiv = e.target.closest('.canvas-preview');
+    if (!previewDiv || !previewDiv.id.startsWith('previewCanvas_')) return;
+    const accId = state.editingAccountId;
+    const scene = getScene(accId);
+    const canvas = previewDiv.querySelector('canvas');
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top) * scaleY;
+
+    // v1.15.30 缩放手柄检测（选中图层 8 个手柄：角点 nw/ne/sw/se + 边中点 n/s/w/e）：命中 → 进入缩放拖拽
+    const selLayer = scene.layers.find(l => l.id === scene.selectedLayerId);
+    if (selLayer) {
+      const hw = 7;
+      const hps = [
+        [selLayer.x, selLayer.y, 'nw'], [selLayer.x + selLayer.width, selLayer.y, 'ne'],
+        [selLayer.x, selLayer.y + selLayer.height, 'sw'], [selLayer.x + selLayer.width, selLayer.y + selLayer.height, 'se'],
+        [selLayer.x + selLayer.width / 2, selLayer.y, 'n'], [selLayer.x + selLayer.width / 2, selLayer.y + selLayer.height, 's'],
+        [selLayer.x, selLayer.y + selLayer.height / 2, 'w'], [selLayer.x + selLayer.width, selLayer.y + selLayer.height / 2, 'e'],
+      ];
+      for (const [hx, hy, dir] of hps) {
+        if (Math.abs(mx - hx) <= hw && Math.abs(my - hy) <= hw) {
+          dragState = { mode: 'resize', layerId: selLayer.id, dir, startX: mx, startY: my, origX: selLayer.x, origY: selLayer.y, origW: selLayer.width, origH: selLayer.height };
+          break;
+        }
+      }
+    }
+    if (dragState) { render(); e.preventDefault(); return; }
+
+    // 检查点击了哪个图层（从上层到下层）
+    let clickedLayer = null;
+    for (let i = scene.layers.length - 1; i >= 0; i--) {
+      const l = scene.layers[i];
+      if (mx >= l.x && mx <= l.x + l.width && my >= l.y && my <= l.y + l.height) {
+        clickedLayer = l;
+        break;
+      }
+    }
+
+    if (clickedLayer) {
+      scene.selectedLayerId = clickedLayer.id;
+      dragState = {
+        mode: 'move',
+        layerId: clickedLayer.id,
+        startX: mx,
+        startY: my,
+        origX: clickedLayer.x,
+        origY: clickedLayer.y,
+      };
+      render();
+      e.preventDefault();
+    }
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!dragState || state.currentRoute !== 'editor') return;
+    const accId = state.editingAccountId;
+    const scene = getScene(accId);
+    const layer = scene.layers.find(l => l.id === dragState.layerId);
+    if (!layer) return;
+
+    const previewDiv = document.getElementById('previewCanvas_' + accId);
+    if (!previewDiv) return;
+    const canvas = previewDiv.querySelector('canvas');
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top) * scaleY;
+
+    // v1.15.30 缩放手柄拖拽：角点自由缩放（宽高同时）、边中点单方向拉伸（拉长拉短）
+    if (dragState.mode === 'resize') {
+      const dx = mx - dragState.startX;
+      const dy = my - dragState.startY;
+      if (dragState.dir.includes('e')) layer.width = Math.max(10, dragState.origW + dx);
+      if (dragState.dir.includes('s')) layer.height = Math.max(10, dragState.origH + dy);
+      if (dragState.dir.includes('w')) { layer.width = Math.max(10, dragState.origW - dx); layer.x = dragState.origX + dx; }
+      if (dragState.dir.includes('n')) { layer.height = Math.max(10, dragState.origH - dy); layer.y = dragState.origY + dy; }
+      return;
+    }
+    layer.x = dragState.origX + (mx - dragState.startX);
+    layer.y = dragState.origY + (my - dragState.startY);
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (dragState) {
+      dragState = null;
+      saveState();
+    }
+  });
+}
+
+// ============================================================
+// 初始化
+// ============================================================
+function init() {
+  // 版本号同步显示（软件内部版本号与安装包版本一致，来自 package.json）
+  if (isElectron && window.tkAPI && window.tkAPI.getVersion) {
+    window.tkAPI.getVersion().then(v => {
+      const tag = document.getElementById('appVersionTag');
+      if (tag) tag.textContent = 'v' + v + ' · 手机直播 · 全自动推流';
+      if (v) document.title = 'TikTok直播工作台 v' + v + ' - 多房间独立直播工作台';
+    }).catch(() => {});
+  }
+
+  // v1.6.2 桌面拖拽：把电脑里的视频/图片直接拖进画面编辑区（canvas 区域）添加为素材
+  document.addEventListener('dragover', (e) => {
+    if (e.target && e.target.closest && e.target.closest('.canvas-area')) {
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    }
+  });
+  document.addEventListener('drop', (e) => {
+    const zone = e.target && e.target.closest ? e.target.closest('.canvas-area') : null;
+    if (!zone) return;
+    e.preventDefault();
+    const files = e.dataTransfer && e.dataTransfer.files;
+    if (!files || files.length === 0) return;
+    const accId = state.editingAccountId;
+    if (!accId) { showToast('请先进入某个房间的画面编辑页再拖入素材', 'warning'); return; }
+    const okExt = /\.(mp4|mov|avi|mkv|webm|jpg|jpeg|png|gif|webp)$/i;
+    let added = 0;
+    for (const f of files) {
+      if (/^(video|image)\//.test(f.type) || okExt.test(f.name)) {
+        handleLayerFileUpload(accId, f);
+        added++;
+      }
+    }
+    if (added > 0) {
+      showToast('已从桌面拖入 ' + added + ' 个素材到画面编辑', 'success');
+      addLog('桌面拖拽添加素材: ' + added + ' 个 → 房间' + accId);
+    } else {
+      showToast('拖入的文件不是视频/图片格式', 'warning');
+    }
+  });
+
+  // restore broadcast state
+  document.getElementById('broadcastText').textContent = '播报:' + (state.broadcast ? '开' : '关');
+  document.getElementById('broadcastDot').style.background = state.broadcast ? 'var(--success)' : 'var(--text-tertiary)';
+
+  // 全局监听：推流码自动回填（任意房间）
+  if (isElectron && window.tkAPI && !window._streamKeyListenerBound) {
+    window.tkAPI.onStreamKeyFound(({ accountId, rtmpUrl, streamKey }) => {
+      const a = state.accounts.find(x => String(x.id) === String(accountId));
+      if (a) {
+        a.status = 'connected';
+        if (streamKey) a.streamKey = streamKey;
+        if (rtmpUrl) a.rtmpUrl = rtmpUrl;
+        saveState();
+        if (state.currentRoute === 'mobile') render();
+        showToast('已自动获取推流码', 'success');
+        addLog((a.roomName || ('房间 ' + a.id)) + (a.name ? ' @' + a.name : '') + ' 推流码已自动获取');
+      }
+    });
+    window._streamKeyListenerBound = true;
+  }
+
+  // 全局监听：运行进度（登录/推流码流程百分比 → 日志区）
+  if (isElectron && window.tkAPI && !window._progressListenerBound) {
+    window.tkAPI.onProgress((data) => updateProgress(data));
+    window._progressListenerBound = true;
+  }
+
+  // v1.15.4 全局监听：手机下播 → 清空界面推流码显示（主进程已清存储，界面同步刷新）
+  if (isElectron && window.tkAPI && window.tkAPI.onStreamCleared && !window._streamClearedBound) {
+    window.tkAPI.onStreamCleared((data) => {
+      const acc = state.accounts.find(a => String(a.id) === String(data.accountId));
+      if (acc) {
+        acc.rtmpUrl = ''; acc.streamKey = ''; acc.streaming = false; acc.status = 'connected';
+        saveState();
+        if (state.currentRoute === 'mobile') render();
+        try { addLog((acc.roomName || ('房间 ' + acc.id)) + ' 推流码已清空（手机下播）'); } catch (e) {}
+      }
+    });
+    window._streamClearedBound = true;
+  }
+
+  // v1.8.0 全局监听：实时互动事件 / 风险告警 / 监控状态
+  if (isElectron && window.tkAPI && !window._imListenerBound) {
+    window.tkAPI.onImEvents((data) => handleImEvents(data));
+    window.tkAPI.onRiskWarning((data) => handleRiskWarning(data));
+    window.tkAPI.onMonitorState((data) => handleMonitorState(data));
+    window.tkAPI.onMonitorCleared((data) => handleMonitorCleared(data));
+    window.tkAPI.onMonitorFrame((data) => handleMonitorFrame(data));
+    // v1.12.43 手机下播提醒（醒目横幅 + 蜂鸣 + 确认）
+    window.tkAPI.onPhoneDownRemind((data) => handlePhoneDownRemind(data));
+    window._imListenerBound = true;
+    // v1.9.0 启动时恢复各房间监控：前端标记运行但主进程没跑（应用重启）→ 自动重新启动
+    state.accounts.forEach(a => {
+      if (!a.monitorRunning) return;
+      if (window.tkAPI.monitorStatus) {
+        window.tkAPI.monitorStatus({ accountId: a.id }).then(r => {
+          if (r && r.running) {
+            a.monitorRunning = true;
+            saveState();
+            render();
+            addLog('房间' + a.id + ' 监控状态已恢复（运行中）');
+          } else {
+            addLog('房间' + a.id + ' 检测到上次监控未恢复，正在自动重启监控...');
+            window.tkAPI.startMonitor({ accountId: a.id, accountName: a.name }).then(r2 => {
+              if (r2 && r2.success) {
+                a.monitorRunning = true;
+                saveState(); render();
+                if (window.tkAPI.monitorFocusUI) window.tkAPI.monitorFocusUI({ accountId: a.id });
+                addLog('房间' + a.id + ' 监控已自动恢复' + (r2.roomId ? '，直播间 ' + r2.roomId : '') + '（独立监控窗口已弹出）');
+              } else {
+                a.monitorRunning = false;
+                saveState(); render();
+                addLog('房间' + a.id + ' 监控自动恢复失败: ' + (r2 && r2.error ? r2.error : '未知错误'));
+              }
+            });
+          }
+        });
+      }
+    });
+  }
+
+  // v1.10.0 独立监控窗口模式（可拖出软件页面外）：index.html?monitor=1&accountId=X
+  const mp = new URLSearchParams(location.search || '');
+  if (mp.get('monitor') === '1') {
+    initMonitorMode(parseInt(mp.get('accountId') || '0', 10));
+    return;
+  }
+
+  // restore route
+  if (state.currentRoute === 'editor' && !state.editingAccountId) {
+    state.currentRoute = 'mobile';
+  }
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.route === state.currentRoute);
+  });
+
+  render();
+  setupCanvasDrag();
+  startCanvasEngine();
+  startLiveTicker();
+  addLog('系统就绪，共 ' + state.accounts.length + ' 个房间，' + state.nodes.length + ' 个节点');
+}
+
+init();
+</script>
+</body>
+</html>

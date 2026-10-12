@@ -1,0 +1,7 @@
+{
+  "name": "tiktok-live-workbench",
+  "productName": "TikTok直播工作台",
+  "version": "1.15.60",
+  "private": true,
+  "main": "main.js"
+}

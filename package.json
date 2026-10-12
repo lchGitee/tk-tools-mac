@@ -1,0 +1,25 @@
+{
+  "name": "tk-tools",
+  "version": "1.15.60",
+  "private": true,
+  "description": "TikTok 直播工作台 Windows 开发工程",
+  "main": "src/main.js",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "start": "node scripts/start.cjs",
+    "dev": "node scripts/start.cjs --dev",
+    "setup:windows": "node scripts/setup-windows.cjs",
+    "check": "node scripts/check.cjs"
+  },
+  "dependencies": {
+    "fluent-ffmpeg": "2.1.3",
+    "obs-websocket-js": "5.0.8",
+    "socks-proxy-agent": "10.1.0",
+    "ws": "8.22.0"
+  },
+  "devDependencies": {
+    "electron": "28.3.3"
+  }
+}

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>使用说明书 - TikTok 直播工作台</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0d1526; color:#dbe4f2; font-family:'Segoe UI','Microsoft YaHei',sans-serif; padding:30px 40px 60px; line-height:1.75; }
+  h1 { font-size:24px; color:#4ade80; margin-bottom:6px; }
+  .sub { color:#8fa3c2; font-size:13px; margin-bottom:28px; border-bottom:1px solid #24344f; padding-bottom:14px; }
+  h2 { font-size:19px; color:#22d3ee; margin:30px 0 12px; padding-left:10px; border-left:4px solid #22d3ee; }
+  h3 { font-size:15px; color:#e8eef8; margin:18px 0 8px; }
+  p, li { font-size:13.5px; color:#c3d0e5; margin-bottom:6px; }
+  ul, ol { padding-left:24px; margin-bottom:10px; }
+  li { margin-bottom:5px; }
+  code { background:#16223a; border:1px solid #2b3a55; border-radius:4px; padding:1px 6px; font-family:Consolas,monospace; font-size:12.5px; color:#93c5fd; }
+  .box { background:#101c31; border:1px solid #22314d; border-radius:10px; padding:14px 16px; margin:12px 0; }
+  .warn { background:#2a1d10; border-color:#7c4a13; }
+  .warn p { color:#f0c68a; }
+  .ok { background:#0e2418; border-color:#1d5c3a; }
+  .ok p { color:#9fe8c0; }
+  .step { background:#121f38; border-radius:10px; padding:12px 16px; margin:10px 0; }
+  .step b { color:#4ade80; }
+  table { border-collapse:collapse; width:100%; margin:10px 0; font-size:13px; }
+  th, td { border:1px solid #2b3a55; padding:8px 12px; text-align:left; }
+  th { background:#16223a; color:#93c5fd; }
+  td { color:#c3d0e5; }
+  .tag { display:inline-block; background:#1d4ed8; color:#fff; border-radius:4px; padding:0 8px; font-size:12px; margin-right:6px; }
+</style>
+</head>
+<body>
+
+<h1>TikTok 直播工作台 · 使用说明书</h1>
+<div class="sub">v1.14.x 系列 ｜ 单端直播（手机开播 → 软件接管推流）｜ 绝对真实数据 ｜ 一卡一机授权</div>
+
+<h2>一、软件简介</h2>
+<p>本软件是一款 TikTok 直播工具：<b>手机开播（Device camera）→ 软件实时抓取本场直播的当场推流码 → 手机断网/飞行 → 软件用当场新码推流（视频素材代替摄像头，GPU 编码）→ 观众看到的是软件画面 → 手动下播手机 → 单端直播达成</b>。</p>
+<div class="ok"><p>核心原则：<b>绝不绕过手机、绝不用旧推流码、绝不建假新房间</b>——每一场都用手机当场开播生成的新码。</p></div>
+
+<h2>二、快速开始（第一次使用）</h2>
+<div class="step"><b>① 激活软件</b>（v1.14.0 及以上）：打开软件 → 输入卡密（TK-XXXX-XXXX-XXXX）→ 点「激活」→ 自动绑定本机机器码。之后直接进。</div>
+<div class="step"><b>② 添加账号</b>：主界面点「添加账号」→ 输入账号名 → 自动打开 TikTok 登录页 → 手机/账号登录 → 保存 Cookie。</div>
+<div class="step"><b>③ 添加节点</b>：点「代理设置 / 保存节点」→ 粘贴你的 vless:// 节点链接 → 保存 → 重启软件（内置 xray 自动起本地代理 10888）。</div>
+<div class="step"><b>④ 配置签名服务</b>（可选，推流帧签名用）：填入 RapidAPI 签名服务的 baseUrl / key / license_id。</div>
+
+<h2>三、直播流程（核心操作，按顺序）</h2>
+<ol>
+  <li>手机打开 TikTok → 点开播（<b>Device camera</b> 模式），保持网络连接；</li>
+  <li>软件主界面点「<b>重新获取推流码</b>」——必须在断网前抓，当场新码（每场都变，不能复用旧码）；</li>
+  <li>确认软件已拿到本场推流码（状态变绿/日志显示成功）；</li>
+  <li>手机<b>断网 / 飞行模式</b>（不要点结束直播）；</li>
+  <li>软件点「<b>开始内置推流</b>」→ 软件会立即试探 + 若 duplicate 自动重试（等平台释放手机推流权，一般 30~60 秒）→ 观众看到软件画面（视频素材）；</li>
+  <li>直播结束：<b>手动在手机端下播</b>（恢复网络后下播，或按手机端提示操作）；</li>
+  <li>软件检测到下播会自动停止推流、清空本场数据。</li>
+</ol>
+<div class="warn"><p>注意：手机断网后不要点「结束直播/End」；断网期间别让手机自动重连太久，以免手机推流权抢占回来。若观众端显示黑屏几秒才下播，是平台释放推流的正常过程。</p></div>
+
+<h2>四、实时监控（实时动态）</h2>
+<div class="step"><b>① 开启监控</b>：点账号卡片上的「开启监控」→ 弹出小电视窗口（观众端视角）+ 实时动态面板。</div>
+<div class="step"><b>② 实时动态</b>：显示真实数据——在线人数 / 点赞 / 礼物 / 关注 / 进场 / 评论，全部来自观众页实时解析，<b>绝无虚拟数据</b>。开播时重新记录，下播即清零。</div>
+<div class="step"><b>③ 风险告警</b>：检测到平台限流/限制文案、直播间异常时自动提示（例如 "LIVE visibility restricted / reproduced content"）。</div>
+<div class="step"><b>④ 自动回复 / 智能回复</b>：只在有人点赞、送礼物、@ 主播、命中自定义关键词时自动回复（主播不主动发言）。话术可在「智能回复」弹窗中修改。</div>
+<ul>
+  <li>「打开直播间」：在新窗口打开观众页（点一次只开一个，重复点聚焦已开的窗口）；</li>
+  <li>「观众链接」：复制观众端链接；</li>
+  <li>下播后实时动态数据清零，重新开播再重新记录。</li>
+</ul>
+
+<h2>五、画面与素材</h2>
+<ul>
+  <li>「选择视频」：任意选择一个视频文件作为推流素材（支持 mp4 等）；</li>
+  <li>「画面编辑」：素材图层 / 预览编辑（选择视频后同步到画面编辑，两者互通）；</li>
+  <li>推流循环：<b>按素材原始时长循环</b>——30 分钟素材播 30 分钟后自动从头循环；不是固定时间重推；</li>
+  <li>编码：优先 NVIDIA GPU（h264_nvenc）硬编码，无 NVIDIA 时回退 CPU（libx264）——建议直播电脑带 NVIDIA 显卡。</li>
+</ul>
+
+<h2>六、签名服务（帧签名推流）</h2>
+<p>TikTok 推流需要帧签名（SEI）。软件默认使用 RapidAPI 签名服务（tiktok-live-studio-api-signer）为每帧打签名，配置：</p>
+<ul>
+  <li>baseUrl：<code>https://tiktok-live-studio-api-signer1.p.rapidapi.com/</code></li>
+  <li>apiKey / license_id：你在 RapidAPI 购买的订阅密钥；</li>
+  <li>保存后自动生效；签名服务异常时推流会被服务器拒（invalid_sign / 握手失败等）。</li>
+</ul>
+
+<h2>七、节点 / 代理（内置 xray）</h2>
+<div class="step"><b>添加节点</b>：代理设置里粘贴节点链接（支持 <code>vless://</code>、<code>vmess://</code>、<code>socks5://</code>）→ 保存 → <b>重启软件</b>生效。</div>
+<div class="step"><b>工作原理</b>：软件内置 xray 内核（无需桌面 v2/v2rayN），起本地 SOCKS5 代理 127.0.0.1:10888，小电视 / 监控 / 后台页 / API 全部走节点；推流走本机隧道（RTMP 也走代理）。</div>
+<ul>
+  <li>换电脑：只需把节点链接重新粘贴保存即可正常使用（节点本身要有效、能连）；</li>
+  <li>节点测试失败常见原因：节点服务器 TLS 握手失败（SSL HANDSHAKE_FAILURE）→ 多为 <b>节点串参数（sni= / pbk=）与服务器不一致</b>或节点已失效，请换有效节点或用 v2 客户端导入同节点串验证；</li>
+  <li>无节点时软件直连（推流本来需要可直连的网络环境，否则必须配节点）。</li>
+</ul>
+
+<h2>八、卡密授权（v1.14.0 及以上）</h2>
+<ul>
+  <li>打开软件先显示激活界面，输入有效卡密才能使用；</li>
+  <li>卡密永久有效、<b>一卡一机</b>：绑定第一台激活的电脑，复制软件到其他电脑无法使用（机器码不匹配）；</li>
+  <li>机器码 = CPU+主板+硬盘序列号哈希：<b>重装系统不变</b>；换主板/硬盘会变，需新卡密；</li>
+  <li>卡密以哈希存储、激活文件加密防篡改，软件内提取不到明文卡密。</li>
+</ul>
+
+<h2>九、常见问题（FAQ）</h2>
+<table>
+  <tr><th>问题</th><th>解决</th></tr>
+  <tr><td>节点不可用 / 无法连接</td><td>先测节点服务器是否在线（TCP 通但 TLS 握手失败=节点串参数/服务器问题），换有效节点；确认已保存并重启软件。</td></tr>
+  <tr><td>推流失败 duplicate</td><td>手机推流权未释放：点推流后软件自动重试，等待 30~60 秒；确保手机已断网。</td></tr>
+  <tr><td>推流握手失败（handshake）</td><td>代理/网络不通：确认节点可用、签名服务正常；看运行日志（菜单→查看运行日志）。</td></tr>
+  <tr><td>实时动态没数据</td><td>确认已开启监控且小电视窗口正常加载观众页；观众端有互动才会记录（点赞/进场/评论/礼物）。</td></tr>
+  <tr><td>平台限流提示</td><td>多为推流素材被判定「非原创/复制内容」：软件会提示，消除限制需换素材策略（真人出镜等），必要时申诉。</td></tr>
+  <tr><td>礼物数量不增加</td><td>礼物消息渲染在观众页特定层，软件已做全页兜底抓取；看运行日志「礼物线索」行定位。</td></tr>
+  <tr><td>下播后数据还在</td><td>旧版本问题；v1.13.x 起下播自动清零，开播重新记录。</td></tr>
+  <tr><td>打开直播间弹两个窗口</td><td>旧版本双触发问题；v1.13.x 起只开一个，重复点聚焦已开窗口。</td></tr>
+  <tr><td>多账号并发</td><td>每个账号独立推流隧道/端口/会话，可 4 账号并行（注意上行带宽：4×2500kbps≈10Mbps，建议上行 ≥15Mbps）。</td></tr>
+</table>
+
+<h2>十、运行日志与诊断</h2>
+<ul>
+  <li>菜单/界面可打开「运行日志」查看推流、监控、风险日志；</li>
+  <li>诊断文件（本机调试用，位于软件数据目录 AppData\Roaming\TikTok直播工作台\ 下）：_risk_alerts.txt（风险告警）、_poll_diag.txt（监控轮询）、_diag_chatitems.txt（互动明细）、_ffmpeg_stderr.txt（推流 FFmpeg 报错）。导出诊断包时自动附带最近记录。</li>
+</ul>
+
+<h2>十一、版本记录（简）</h2>
+<ul>
+  <li>v1.13.0-1.13.12：推流链路直连版（早于直连被墙）；</li>
+  <li>v1.13.14：SOCKS5 握手修复（代理隧道可推流）；</li>
+  <li>v1.13.15-1.13.23：实时动态四层根因修复（preload 注入 / 首次轮询 / 类型全局化 / 噪声清洗 / 节流）；</li>
+  <li>v1.13.24-1.13.27：限流检测 + 监控浮窗重开 + 自动互动收敛 + 疑似无流量；</li>
+  <li>v1.13.28-1.13.30：礼物全页兜底 + ×N 累加 + 限流外网 HTML 扫描；</li>
+  <li>v1.14.0：卡密授权系统（一卡一机、机器码绑定、激活文件加密）；</li>
+  <li>v1.14.1：内置说明书。</li>
+</ul>
+
+</body>
+</html>
