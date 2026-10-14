@@ -12,6 +12,14 @@ if (!app.isPackaged) {
   fs.mkdirSync(devData, { recursive: true });
   app.setPath('userData', devData);
 }
+// 同一数据目录只允许一个工作台实例，避免重复创建代理。
+if (!app.requestSingleInstanceLock()) app.exit(0);
+app.on('second-instance', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show(); mainWindow.focus();
+  }
+});
 const net = require('net');
 const tls = require('tls');
 const https = require('https'); // v1.12.37 补上（此前缺失导致 httpsJson 一直抛错被吞）
@@ -35,31 +43,9 @@ process.on('uncaughtException', (err) => {
     fs.appendFileSync(path.join(app.getPath('userData'), 'run.log'), '[' + new Date().toISOString() + '] [FATAL] ' + ((err && err.stack) || _m) + '\n');
   } catch (e) {}
 });
-// ==================== 卡密授权系统 v1.14.0（本地验证 / 一卡一机 / 永久有效）====================
-// 卡密库：只存 SHA-256 哈希（明文卡密不在软件里，防提取）；激活文件绑定机器码，复制到别的电脑无法使用
-const LICENSE_HASHES = [
-  '57961038c232ef42a768c53ca1f8b15e25cf41e37af2b7f4537907d2973d8238',
-  '711a5d6d5e5a0ae056815179fa3f1a83a7978902d240b87caa57efb3c92f8926',
-  '2f4a9a5e969e235b70d76e814321dd54f6116ec34dde890df1b53431471d05e5',
-  '74a01d694b95e3efa1074e0907ec18b17f7db4a80766887c9c952c7250902b12',
-  '741b0ddc6dc1d5977907e35a2513ee62caa6ccd24f6eb54ac09c8cb9909a321c',
-  '8b3e7bfa462cd95ed40d89909cfdd7edbd4546e7e6f8abbaa7e0a2d0de7a8b96',
-  '979adcd9e814a37947533d7e4f98ded89ad61b6fbf75005d3a951c6a4925e1e9',
-  '17a3bcb9a39b3683927964e26e2f4bd6e574c0436d2aa188577da633cdfd52eb',
-  '56de25084b7f314c991ea81bb9f8388553c8ca0b82a8f9a1f894f9d5021169f1',
-  'c9e8aa46afb5c8f4d72d622f698965c970247bb02d7797705f4eadceacdef487',
-  '29367eb7683bf6c49c5a9a243ab586102298bccd62eac6228004f2307fe559a9',
-  '1e5f7a03635cbc5d8c7125f750828110cf4a271f9f84b5dcdf2114ed39548fb9',
-  '175aaad43f77a64fe8d55a089514c92bcf59732b25f6ca65e5f56830621fe305',
-  '2097a8239eb798b8bb2fa4d60c271f8ac0cc1c82aca643e80aa102c73fd9dda2',
-  'cc1a4f2e2f4cd6304b1134934a2b030565c03af86b18328d985ad97392779a6f',
-  'cb1dde4329e2d4c70cce38440bbb90f0d4e712a77872c5ae66def72329fd230b',
-  'fed991e015a57fac01221009bc94758d7c87c7374729b0d275a99d69d8d38ff1',
-  '92647dad4aa6eefc16e2866628634952d05bfba606f9588077b9487613c2472b',
-  '9017bd6e7a121fd0b1cc8d8130e79d487166b62b9d160b13f785b2bf2043f5ae',
-  '26327c2a6a4a6a1843da1e02dd7abcc0ef06f092deae1ce8b4becf1147331dd7'
-];
-const LIC_KEY = crypto.createHash('sha256').update('TK-Live-Workbench|2026|auth|v1').digest(); // 32 字节 AES 密钥
+// 离线授权：客户端只持有公钥，授权必须由签发工具绑定指定机器。
+const { createLicenseStore } = require('./license');
+const licensePublicKey = crypto.createPublicKey(fs.readFileSync(path.join(__dirname, 'license-public-key.pem')));
 let _machineCache = '';
 function getMachineCode() {
   if (_machineCache) return _machineCache;
@@ -91,43 +77,16 @@ function getMachineCode() {
 function licPath() {
   return path.join(app.isPackaged ? path.dirname(app.getPath('exe')) : app.getPath('userData'), 'activation.lic');
 }
-function licRead() {
-  try {
-    const data = fs.readFileSync(licPath());
-    if (data.length < 29) return null;
-    const iv = data.slice(0, 12), tag = data.slice(12, 28), ct = data.slice(28);
-    const d = crypto.createDecipheriv('aes-256-gcm', LIC_KEY, iv);
-    d.setAuthTag(tag);
-    return JSON.parse(Buffer.concat([d.update(ct), d.final()]).toString('utf8'));
-  } catch (e) { return null; }
-}
-function licWrite(obj) {
-  const iv = crypto.randomBytes(12);
-  const c = crypto.createCipheriv('aes-256-gcm', LIC_KEY, iv);
-  const ct = Buffer.concat([c.update(Buffer.from(JSON.stringify(obj), 'utf8')), c.final()]);
-  fs.writeFileSync(licPath(), Buffer.concat([iv, c.getAuthTag(), ct]));
-}
-function licenseState() {
-  const m = getMachineCode();
-  const lic = licRead();
-  if (!lic) return { ok: false, reason: 'not_activated', machine: m };
-  if (lic.m !== m) return { ok: false, reason: 'machine_mismatch', machine: m };
-  return { ok: true, reason: 'ok', machine: m };
-}
-function activateLicense(code) {
-  const c = String(code || '').trim().toUpperCase();
-  if (!/^TK-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(c)) return { ok: false, reason: 'format' };
-  const h = crypto.createHash('sha256').update(c).digest('hex');
-  if (!LICENSE_HASHES.includes(h)) return { ok: false, reason: 'invalid' };
-  licWrite({ m: getMachineCode(), c: h.slice(0, 16), t: Date.now() });
-  return { ok: true, reason: 'ok' };
-}
+const licenseStore = createLicenseStore({ filePath: licPath(), getMachineCode, publicKey: licensePublicKey });
+function licenseState() { return licenseStore.state(); }
+function activateLicense(code) { return licenseStore.activate(code); }
 ipcMain.handle('license:check', async () => licenseState());
 ipcMain.handle('license:activate', async (event, { code }) => activateLicense(code));
-// ==================== 卡密授权系统结束 ====================
+// ==================== 离线授权结束 ====================
 const { isStreamResponseUrl, extractStreamInfoFromBody } = require('./stream-capture'); // v1.12.0 抖歪移植
 const { getSignatures, getFrameSignatures, checkSigner } = require('./signer-client'); // v1.12.34/1.12.50 抖歪同款：RapidAPI 签名服务（含 /framesign/batch 帧签名）
 const { OBSEngine } = require('./obs-engine'); // v1.12.47 抖歪同款：OBS 引擎推流（OBSWebSocket 控制本机 OBS，替换 FFmpeg）
+const { createOutputProgressTracker } = require('./stream-progress');
 const { MediaEgress } = require('./media-egress'); // v1.12.49/1.12.50 抖歪同款：本机隧道转发推流（FFmpeg 推本机 → TCP 透传 TikTok，支持代理隧道）
 const { FrameSigner, FlvSeiTransform } = require('./flv-sei'); // v1.12.50 抖歪同款：帧签名 SEI 注入（not_allowed 根治）
 const { XrayRuntime, XrayProcess } = require('./xray-runtime'); // v1.13.11 抖歪同款：内置 xray 代理内核（不依赖桌面 v2/v2rayN）
@@ -164,24 +123,18 @@ function readNodesFile() {
   try {
     const d = JSON.parse(fs.readFileSync(NODES_FILE, 'utf8') || '[]');
     return Array.isArray(d) ? d.filter(n => n && typeof n.link === 'string' && n.link.trim()) : [];
-  } catch (e) { return []; }
+  } catch (e) { console.error('[内置代理] 节点配置读取失败:', e.message); return []; }
 }
 function writeNodesFile(nodes) {
-  try { fs.writeFileSync(NODES_FILE, JSON.stringify(Array.isArray(nodes) ? nodes : [], null, 1)); } catch (e) {}
+  fs.writeFileSync(NODES_FILE, JSON.stringify(Array.isArray(nodes) ? nodes : [], null, 1));
 }
-let _builtinProxyOn = false;
-try { _builtinProxyOn = readNodesFile().length > 0; } catch (e) {}
-// v1.14.5 页面窗口不再设全局代理（appendSwitch）：全局 10888 在 xray 启动失败时会让所有页面加载失败（登录黑屏）。
-// 页面窗口一律按 applyProxyToWindow 探测结果走（内置 xray 10888 → 桌面 v2 10808 → 直连）。
-// 仅保留主进程 API 的环境变量代理（有内置节点时走 10888，无节点时直连）。
-let _proxyServer = _builtinProxyOn ? ('socks5://127.0.0.1:' + XRAY_PROXY_PORT) : null;
-if (_proxyServer) {
-  process.env.HTTPS_PROXY = _proxyServer;
-  process.env.HTTP_PROXY = _proxyServer;
-}
+let _builtinProxyOn = readNodesFile().length > 0;
+let _proxyServer = null;
+let _effectiveProxy = null;
+let proxySync = Promise.resolve();
+const inheritedProxyEnv = { HTTP_PROXY: process.env.HTTP_PROXY, HTTPS_PROXY: process.env.HTTPS_PROXY };
+const sessionProxyRules = new WeakMap();
 
-// v1.14.4 代理可用性探测：内置 xray(10888) → 桌面 v2(10808) → 直连（都没有代理就直连，避免黑屏）
-let _effectiveProxy = _proxyServer; // 初始：有内置节点时默认 10888
 function isPortOpen(port, ms) {
   return new Promise((res) => {
     const c = net.connect({ host: '127.0.0.1', port });
@@ -191,11 +144,49 @@ function isPortOpen(port, ms) {
   });
 }
 async function refreshEffectiveProxy() {
-  try {
-    if (await isPortOpen(XRAY_PROXY_PORT)) { _effectiveProxy = 'socks5://127.0.0.1:' + XRAY_PROXY_PORT; return; }
-    if (await isPortOpen(10808)) { _effectiveProxy = 'socks5://127.0.0.1:10808'; return; }
-    _effectiveProxy = null;
-  } catch (e) { _effectiveProxy = null; }
+  // 使用本实例的实际端口，不把别的版本占用的 10888 当作自己的代理。
+  const endpoint = xrayRuntime && xrayRuntime.isRunning() && xrayRuntime.endpoint();
+  if (endpoint) _effectiveProxy = 'socks5://' + endpoint.host + ':' + endpoint.port;
+  else if (!_builtinProxyOn && await isPortOpen(10808)) _effectiveProxy = 'socks5://127.0.0.1:10808';
+  else _effectiveProxy = null;
+  _proxyServer = _effectiveProxy;
+  for (const key of ['HTTP_PROXY', 'HTTPS_PROXY']) {
+    if (_proxyServer) process.env[key] = _proxyServer;
+    else if (inheritedProxyEnv[key] == null) delete process.env[key];
+    else process.env[key] = inheritedProxyEnv[key];
+  }
+}
+function syncBuiltinProxy() {
+  if (proxyShutdownPending) return Promise.reject(new Error('软件正在退出'));
+  // 保存和登录可能同时触发初始化，串行执行以免相互停止新进程。
+  proxySync = proxySync.catch(() => {}).then(async () => {
+    if (proxyShutdownPending) throw new Error('软件正在退出');
+    const nodes = readNodesFile();
+    _builtinProxyOn = nodes.length > 0;
+    const link = nodes.length ? nodes[0].link : '';
+    if (xrayRuntime && (!link || xrayRuntime.activeLink !== link || !xrayRuntime.isRunning())) {
+      await xrayRuntime.stop();
+      xrayRuntime = null;
+    }
+    if (link && !xrayRuntime) {
+      const runtime = new XrayRuntime({ logDir: app.getPath('userData') });
+      try {
+        const endpoint = await runtime.start(link);
+        xrayRuntime = runtime;
+        console.log('[内置代理] 已启动 ' + endpoint.host + ':' + endpoint.port + ' 节点 ' + (nodes[0].name || nodes[0].id) + ' PID=' + runtime.proc.child.pid);
+      } catch (error) {
+        await runtime.stop();
+        await refreshEffectiveProxy();
+        throw error;
+      }
+    }
+    await refreshEffectiveProxy();
+    await applyProxyToDefaultSession();
+    for (const windows of Object.values(accountWindows)) {
+      for (const win of windows) if (!win.isDestroyed()) await applyProxyToWindow(win);
+    }
+  });
+  return proxySync;
 }
 // v1.14.17 代理出口实测（强化版）：socks5 CONNECT 成功 ≠ 数据链路通（节点 Reality 层失效时 CONNECT 被接受但 TLS 数据转发超时）
 // → 改为真实 HTTPS 请求 generate_204（完整 TLS 握手 + 数据往返），5 秒超时，拿到 204 才算可用。
@@ -218,24 +209,24 @@ function testProxyEgress(port, timeoutMs) {
 // v1.14.7 修复获取推流码慢/失败：v1.14.5 移除 appendSwitch 全局代理后，
 // electronNet（httpsJson 查询房间号/推流码用的 Chromium 网络栈）走 defaultSession 且不读环境变量 → 直连 TikTok 被墙（ERR_CONNECTION_RESET/TIMED_OUT）。
 // 这里把探测结果同步到 defaultSession：electronNet 走可用代理；无代理 → 直连（不会黑屏，行为与页面窗口 applyProxyToWindow 一致）。
-function applyProxyToDefaultSession() {
-  try {
-    const ses = session.defaultSession;
-    if (ses && ses.setProxy) {
-      const p = _effectiveProxy;
-      ses.setProxy(p ? { proxyRules: p, proxyBypassRules: '<local>;localhost;127.0.0.1;10.*;192.168.*' } : { mode: 'direct' }).catch(() => {});
-    }
-  } catch (e) {}
+async function applySessionProxy(ses) {
+  const p = _effectiveProxy;
+  if (sessionProxyRules.has(ses) && sessionProxyRules.get(ses) === p) return;
+  await ses.setProxy(p ? { proxyRules: p, proxyBypassRules: '<local>;localhost;127.0.0.1;10.*;192.168.*' } : { mode: 'direct' });
+  await ses.closeAllConnections();
+  sessionProxyRules.set(ses, p);
 }
-// 把探测结果应用到某个窗口的 session（页面加载走可用代理；无代理 → 直连）
-function applyProxyToWindow(win) {
-  try {
-    const ses = win.webContents.session;
-    if (ses && ses.setProxy) {
-      const p = _effectiveProxy;
-      ses.setProxy(p ? { proxyRules: p, proxyBypassRules: '<local>;localhost;127.0.0.1;10.*;192.168.*' } : { mode: 'direct' }).catch(() => {});
-    }
-  } catch (e) {}
+async function applyProxyToDefaultSession() {
+  await applySessionProxy(session.defaultSession);
+}
+async function applyProxyToWindow(win) {
+  await applySessionProxy(win.webContents.session);
+}
+async function loadAccountPage(win, url, options) {
+  await syncBuiltinProxy();
+  await applyProxyToWindow(win);
+  console.log('[页面代理] ' + new URL(url).hostname + ' → ' + (_effectiveProxy || '直连'));
+  return win.loadURL(url, options);
 }
 
 // v1.14.5 一键导出诊断包：日志 + 代理状态 + 节点格式（uuid/pbk 打码）+ 账号摘要（不含 cookie 值）→ 桌面 txt
@@ -269,6 +260,9 @@ ipcMain.handle('diagnostics:export', async () => {
     lines.push('系统: ' + process.platform + ' ' + process.arch + ' / Electron ' + process.versions.electron + ' / Node ' + process.versions.node);
     lines.push('软件目录: ' + __dirname);
     lines.push('用户数据: ' + app.getPath('userData'));
+    lines.push('应用 PID: ' + process.pid + ' / 工作目录: ' + process.cwd());
+    lines.push('Xray PID: ' + (xrayRuntime && xrayRuntime.proc && xrayRuntime.proc.child ? xrayRuntime.proc.child.pid : '未运行'));
+    lines.push('Xray 文件: ' + unpackedPath(path.join(__dirname, 'xray-portable', 'xray.exe')));
     lines.push('');
     lines.push('--- 代理状态 ---');
     lines.push('全局代理: ' + (_proxyServer || '未设置(直连)'));
@@ -353,7 +347,8 @@ ipcMain.handle('diagnostics:export', async () => {
     // v1.14.16 xray 内核日志（节点失效/握手失败定位用）：取最新一个 xray_*.log 尾部 8KB
     try {
       const _xdir = app.getPath('userData');
-      const _xf = fs.readdirSync(_xdir).filter(f => /^xray_.*\.log$/.test(f)).sort().pop();
+      const _logs = fs.readdirSync(_xdir).filter(f => /^xray_.*\.log$/.test(f) && !/^xray_test_/.test(f));
+      const _xf = (xrayRuntime && xrayRuntime.proc && xrayRuntime.proc.logPath && path.basename(xrayRuntime.proc.logPath)) || _logs.sort((a, b) => fs.statSync(path.join(_xdir, a)).mtimeMs - fs.statSync(path.join(_xdir, b)).mtimeMs).pop();
       if (_xf) {
         const _xc = fs.readFileSync(path.join(_xdir, _xf), 'utf8');
         lines.push('[xray 内核日志: ' + _xf + ']');
@@ -477,7 +472,6 @@ function createAccountWindow(accountId, opts) {
   win.setMenuBarVisibility(false);
   trackWindow(accountId, win);
   // v1.14.4 页面窗口按探测结果应用代理（无可用代理 → 直连，避免登录页黑屏）
-  applyProxyToWindow(win);
   return win;
 }
 
@@ -500,7 +494,8 @@ function createWindow() {
     },
   });
   mainWindow.setMenuBarVisibility(false);
-  mainWindow.loadFile('index.html');
+  // 开发与打包后的应用根目录不同，按脚本位置加载页面。
+  mainWindow.loadFile(path.join(__dirname, 'index.html'));
   if (process.argv.includes('--dev')) mainWindow.webContents.openDevTools();
   mainWindow.on('closed', () => {
     Object.keys(streamProcesses).forEach(id => stopStream(id));
@@ -518,28 +513,31 @@ app.whenReady().then(async () => {
       fs.renameSync(RUN_LOG, _old);
     }
   } catch (e) {}
-  // v1.13.11 内置 xray 代理启动（有节点时）：页面/API 全部走内置代理，无需桌面 v2
-  // v1.14.18 按用户要求恢复：固定使用第一个节点（不做启动出口验证），换节点时用户手动在软件里调整/测试
   try {
-    const _savedNodes = readNodesFile();
-    if (_savedNodes.length) {
-      const _nodeLink = _savedNodes[0].link;
-      if (!xrayRuntime) xrayRuntime = new XrayRuntime();
-      const ep = await xrayRuntime.start(_nodeLink);
-      console.log('[内置代理] 已启动', ep.host + ':' + ep.port, '节点', (_savedNodes[0].name || _nodeLink.slice(0, 40)));
-    } else {
-      console.log('[内置代理] 无保存节点，走直连（推流直连正常；页面直连 TikTok 实测可用）');
-    }
-  } catch (e) {
-    console.error('[内置代理] 启动失败:', e.message, '（若页面无法访问 TikTok，请更换节点或删除节点后重启软件改直连）');
+    await syncBuiltinProxy();
+  } catch (error) {
+    console.error('[内置代理] 启动失败:', error.message);
   }
-  // v1.14.4 探测最终可用代理（内置 xray → 桌面 v2 → 直连），登录/监控等页面窗口按此走代理
-  await refreshEffectiveProxy();
-  applyProxyToDefaultSession(); // v1.14.7 修复：electronNet（获取推流码/查询房间号）走 defaultSession 代理
-  console.log('[代理] 生效代理: ' + (_effectiveProxy ? _effectiveProxy : '直连（无可用代理）'));
+  console.log('[代理] 生效代理: ' + (_effectiveProxy || '直连（无可用代理）'));
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
+let proxyShutdownComplete = false;
+let proxyShutdownPending = false;
+app.on('before-quit', (event) => {
+  if (proxyShutdownComplete) return;
+  event.preventDefault();
+  if (proxyShutdownPending) return;
+  proxyShutdownPending = true;
+  (async () => {
+    await proxySync.catch(error => console.error('[内置代理] 退出前初始化失败:', error.message));
+    await Promise.all(Object.keys(streamProcesses).map(id => stopStream(id)));
+    if (xrayRuntime) await xrayRuntime.stop();
+  })().catch(error => console.error('[退出清理] 失败:', error.message)).finally(() => {
+    proxyShutdownComplete = true;
+    app.quit();
   });
 });
 app.on('window-all-closed', () => {
@@ -853,11 +851,11 @@ function startLoginMonitor(accountId, accountName, win, opts) {
               } else if (rs.phase === 2) {
                 rs.entryCount++;
                 sendProgress(accountId, 80, '刷新无进展，切换入口到直播中心首页重试（窗口刷新 ' + rs.refreshCount + ' 次 · 换入口 ' + rs.entryCount + ' 次）...');
-                try { await win.loadURL('https://livecenter.tiktok.com/', { userAgent: UA }); } catch (e) {}
+                try { await loadAccountPage(win, 'https://livecenter.tiktok.com/', { userAgent: UA }); } catch (e) {}
               } else if (rs.phase === 3) {
                 rs.entryCount++;
                 sendProgress(accountId, 82, '再次切换回开播页面重试（窗口刷新 ' + rs.refreshCount + ' 次 · 换入口 ' + rs.entryCount + ' 次）...');
-                try { await win.loadURL('https://livecenter.tiktok.com/producer', { userAgent: UA }); } catch (e) {}
+                try { await loadAccountPage(win, 'https://livecenter.tiktok.com/producer', { userAgent: UA }); } catch (e) {}
               } else {
                 sendProgress(accountId, 85, '自动重试已完成（窗口刷新 ' + rs.refreshCount + ' 次 · 换入口 ' + rs.entryCount + ' 次），请在窗口内手动点击「开始直播 / Go LIVE」获取推流码（获取成功后自动回填）');
               }
@@ -910,12 +908,16 @@ ipcMain.handle('tiktok:openLogin', async (event, { accountId, accountName, autoC
   // 登录窗口不注入旧 Cookie：旧失效 Cookie 会引发 producer 服务端错误，登录流程必须是全新会话
   // v1.14.3 只清 cookies、保留 localstorage（设备标识 ttwid 等）——清了会变成"全新设备"，TikTok 会话极短 → 登录后自动掉线
   try { await win.webContents.session.clearStorageData({ storages: ['cookies'] }); } catch (e) {}
-  // v1.14.4 登录前再探测一次代理并应用（内置 xray → 桌面 v2 → 直连；无代理直连，确保登录页能加载）
-  await refreshEffectiveProxy();
-  applyProxyToWindow(win);
+  win.webContents.on('render-process-gone', (event, details) => console.error('[登录窗口] 渲染进程异常:', details.reason));
   try {
-    await win.loadURL('https://livecenter.tiktok.com/producer', { userAgent: UA });
-  } catch (e) { console.error('[登录窗口] 加载失败:', e.message); }
+    await loadAccountPage(win, 'https://livecenter.tiktok.com/producer', { userAgent: UA });
+    console.log('[登录窗口] 加载完成:', win.webContents.getURL().split('?')[0]);
+  } catch (error) {
+    console.error('[登录窗口] 加载失败:', error.message);
+    sendProgress(accountId, 0, '登录页面加载失败: ' + error.message);
+    win.close();
+    return { success: false, error: error.message };
+  }
   const data = loadAccounts();
   const info = data[accountId];
   if (info && info.loggedIn) sendLoginState(accountId, info);
@@ -1144,7 +1146,7 @@ async function fetchStreamKeyByApi(accountId, accountName) {
             capWin._captureTemp = true;
             await injectSavedCookies(accountId, capWin.webContents.session);
             const nm = (loadAccounts()[accountId] || {}).name || '';
-            try { await Promise.race([capWin.loadURL('https://www.tiktok.com/@' + encodeURIComponent(nm.replace(/^@/, '')) + '/live', { userAgent: UA }), sleep(15000)]); } catch (e) {}
+            try { await Promise.race([loadAccountPage(capWin, 'https://www.tiktok.com/@' + encodeURIComponent(nm.replace(/^@/, '')) + '/live', { userAgent: UA }), sleep(15000)]); } catch (e) {}
           }
           const pageRes = await Promise.race([
             capWin.webContents.executeJavaScript(`(async () => {
@@ -1247,7 +1249,7 @@ async function fetchStreamKeyByApi(accountId, accountName) {
         const liveUrl = name
           ? 'https://www.tiktok.com/@' + encodeURIComponent(name.replace(/^@/, '')) + '/live'
           : 'https://www.tiktok.com/live';
-        try { await Promise.race([capWin.loadURL(liveUrl, { userAgent: UA }), sleep(20000)]); } catch (e) {}
+        try { await Promise.race([loadAccountPage(capWin, liveUrl, { userAgent: UA }), sleep(20000)]); } catch (e) {}
       }
       const cap = await runStreamCaptureBounded(accountId, capWin);
       if (cap && cap.serverUrl && cap.streamKey) {
@@ -1276,7 +1278,7 @@ async function fetchStreamKeyByApi(accountId, accountName) {
         ? 'https://www.tiktok.com/@' + encodeURIComponent(name.replace(/^@/, '')) + '/live'
         : 'https://www.tiktok.com/live';
       try {
-        await Promise.race([win.loadURL(liveUrl, { userAgent: UA }), sleep(20000)]);
+        await Promise.race([loadAccountPage(win, liveUrl, { userAgent: UA }), sleep(20000)]);
       } catch (e) { console.error('[API推流码] 页面加载:', e.message); }
     }
     // 等待登录态就绪（最多 30s），就绪后页面 fetch 才带得上 Cookie
@@ -1491,7 +1493,7 @@ ipcMain.handle('tiktok:openProducerWindow', async (event, { accountId, accountNa
   // 预注入已保存 Cookie
   await injectSavedCookies(accountId, win.webContents.session);
   try {
-    await win.loadURL('https://livecenter.tiktok.com/producer', { userAgent: UA });
+    await loadAccountPage(win, 'https://livecenter.tiktok.com/producer', { userAgent: UA });
   } catch (e) { console.error('[后台窗口] 加载失败:', e.message); }
   startLoginMonitor(accountId, accountName, win, { mode: mode || 'mobile', autoCloseOnKey: autoClose !== false });
   win.on('closed', () => { delete autoGoLiveFlags[accountId]; delete autoCloseFlags[accountId]; delete scanRetry[accountId]; });
@@ -1515,7 +1517,7 @@ ipcMain.handle('tiktok:openLiveWindow', async (event, { accountId, accountName }
   });
   win.__liveWindowKind = 'live';
   try {
-    await win.loadURL(url, { userAgent: UA });
+    await loadAccountPage(win, url, { userAgent: UA });
   } catch (e) { console.error('[直播间窗口] 加载失败:', e.message); }
   return { success: true };
 });
@@ -1826,7 +1828,7 @@ ipcMain.handle('node:test', async (event, { url }) => {
   if (!base || !base.success) return base || { success: false, error: '节点不可达' };
   // v1.14.7 连通通过后：起独立 xray 实测下行/上行（不打断当前运行节点）
   try {
-    const proc = new XrayProcess({ executable: unpackedPath(path.join(__dirname, 'xray-portable', 'xray.exe')) });
+    const proc = new XrayProcess({ executable: unpackedPath(path.join(__dirname, 'xray-portable', 'xray.exe')), logDir: app.getPath('userData') });
     const ep = await proc.startWithNode(u, await reserveTestPort());
     const sp = await nodeSpeedTest(ep.port);
     await proc.stop().catch(() => {});
@@ -1837,9 +1839,15 @@ ipcMain.handle('node:test', async (event, { url }) => {
 });
 
 // v1.13.11 内置 xray 代理：节点保存（写 nodes.json，重启后软件自起内置代理）；代理状态查询
-ipcMain.handle('node:save', (event, { nodes }) => {
-  writeNodesFile(Array.isArray(nodes) ? nodes : []);
-  return { ok: true, saved: Array.isArray(nodes) ? nodes.length : 0 };
+ipcMain.handle('node:save', async (event, { nodes }) => {
+  try {
+    writeNodesFile(Array.isArray(nodes) ? nodes : []);
+    await syncBuiltinProxy();
+    return { ok: true, saved: Array.isArray(nodes) ? nodes.length : 0 };
+  } catch (error) {
+    console.error('[内置代理] 保存节点后启动失败:', error.message);
+    return { ok: false, error: error.message };
+  }
 });
 // v1.14.19 节点权威来源：前端启动时从此处读回 nodes.json（localStorage 保存有异步落盘延迟，快速重启会丢节点）
 ipcMain.handle('node:list', () => {
@@ -2090,8 +2098,11 @@ function buildPushUrl(rtmpUrl, streamKey) {
 
 // v1.13.11 探测本机代理（优先内置 xray 10888；桌面 v2rayN SOCKS5 10808/HTTP 10809 兜底；用于 MediaEgress 隧道）
 function detectHttpProxy(port) {
+  const endpoint = xrayRuntime && xrayRuntime.isRunning() && xrayRuntime.endpoint();
+  if (endpoint) return Promise.resolve({ ...endpoint, type: 'socks5' });
+  if (_builtinProxyOn) return Promise.reject(new Error('已配置的内置节点未运行，请检查启动日志'));
   return new Promise((resolve) => {
-    const candidates = port ? [Number(port)] : [XRAY_PROXY_PORT, 10808, 10809];
+    const candidates = port ? [Number(port)] : [10808, 10809];
     const tryNext = (i) => {
       if (i >= candidates.length) { resolve(null); return; }
       const p = candidates[i];
@@ -2125,6 +2136,7 @@ async function startStreamNow(accountId, payload) {
   // v1.14.13 启动互斥：同一账号同一时刻只允许一个推流启动流程（防按钮连点/手动+自动重试叠加 → 多 FFmpeg 并发互相杀 → 服务器 not_allowed 风暴）
   if (streamStarting[accountId]) return { success: false, error: '推流正在启动中，请稍候（已忽略重复请求）' };
   streamStarting[accountId] = true;
+  await syncBuiltinProxy();
   const ffmpegPath = findFFmpeg();
   // v1.13.0 编码器自动选择：NVIDIA GPU(h264_nvenc) 优先（4 账号并发推流 CPU 友好），无则 libx264 软编码
   // v1.14.9 若本账号推流时 nvenc 实际编码失败，回退标志已置位 → 直接 libx264 重推
@@ -2199,7 +2211,7 @@ async function startStreamNow(accountId, payload) {
   if (!ffmpegPath) return { success: false, error: '未找到内置FFmpeg引擎（应在 resources\\app\\ffmpeg\\bin\\ffmpeg.exe 或 app.asar.unpacked\\ffmpeg\\bin\\ffmpeg.exe，约 97MB）。请重新安装软件或完整拷贝成品文件夹（含 ffmpeg 目录），不要只拷主程序' };
 
   const fullUrl = buildPushUrl(rtmpUrl, streamKey);
-  console.log(`[推流] 房间 ${accountId} 开始 FFmpeg 推流到 ${fullUrl}`);
+  console.log(`[推流] 房间 ${accountId} 开始 FFmpeg 推流到 ${new URL(fullUrl).host}`);
 
   // 视频原声轨：收集画面编辑器里所有含音轨的视频文件路径
   const audioFiles = [];
@@ -2280,13 +2292,17 @@ async function startStreamNow(accountId, payload) {
       console.log('[推流] 未检测到可用代理（10888/10808/10809），RTMP 直连（当前网络直连 TikTok 可能不可达，失败请检查节点）');
       if (mainWindow) mainWindow.webContents.send('stream:log', { accountId, log: '[推流] 未检测到可用代理，RTMP 直连（直连 TikTok 可能不通，失败请检查节点管理里的节点）' });
     }
-    const egress = new MediaEgress({ proxy });
+    const egress = new MediaEgress({ proxy, onLog: message => {
+      console.log('[媒体出口] 房间 ' + accountId + ' ' + message);
+      sendToUI('stream:log', { accountId, log: '[媒体出口] ' + message });
+    } });
     const out = await egress.start(fullUrl);
     mediaEgresses[accountId] = egress;
     egressOut = out;
     console.log(`[推流] MediaEgress隧道已启动: app=${out.args[0]} 本机=${out.url} 代理=${proxy ? ('127.0.0.1:' + proxy.port) : '直连'}`);
     if (mainWindow) mainWindow.webContents.send('stream:log', { accountId, log: `[推流] 本机隧道转发已启动（抖歪式${proxy ? ' 代理' : ' 直连'}）` });
   } catch (e) {
+    if (_builtinProxyOn) throw e;
     console.log('[推流] MediaEgress启动失败，用完整URL兜底:', e.message);
     try {
       const _u = new URL(fullUrl);
@@ -2318,8 +2334,23 @@ async function startStreamNow(accountId, payload) {
     }
   }
   try {
+    if (!useSignPipe) args.push('-progress', 'pipe:1', '-stats_period', '1', '-nostats');
     const proc = spawn(ffmpegPath, args, { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
     streamProcesses[accountId] = proc;
+    let outputStarted = false, startupFailure = '';
+    const startupTimer = setTimeout(() => {
+      if (streamProcesses[accountId] !== proc || outputStarted) return;
+      startupFailure = '连接超过 30 秒仍未输出视频，请导出诊断包';
+      proc.kill('SIGKILL');
+    }, 30000);
+    proc.once('close', () => clearTimeout(startupTimer));
+    proc.stdout.on('data', createOutputProgressTracker(({ frame, bytes }) => {
+      if (streamProcesses[accountId] !== proc || streamStopIntent[accountId]) return;
+      outputStarted = true;
+      clearTimeout(startupTimer);
+      console.log('[推流] 房间 ' + accountId + ' 已开始输出 frame=' + frame + ' bytes=' + bytes);
+      sendToUI('stream:log', { accountId, log: '[推流] 推流已启动（FFmpeg 已输出音视频数据）' });
+    }));
     let proc2 = null, transform = null;
     if (useSignPipe && egressOut) {
       // FFmpeg#2（签名输出）：收管道 → 直推 MediaEgress（-rtmp_app/-rtmp_playpath/-rtmp_tcurl 由 egress 提供，tcUrl=真实服务器）
@@ -2358,15 +2389,18 @@ async function startStreamNow(accountId, payload) {
     // v1.13.9 stderr 缓存（close 时判断 duplicate 等服务器拒绝原因，给前端明确提示）
     let _stderrBuf = '';
     proc.stderr.on('data', (data) => {
-      const msg = data.toString();
+      const msg = data.toString().replace(/rtmps?:\/\/[^\s]+/g, '[推流地址已隐藏]');
       if (_stderrBuf.length < 8192) _stderrBuf += msg;
       try { fs.appendFileSync(FF_STDERR, '[' + new Date().toISOString() + '] ' + msg); } catch (e) {}
       if (mainWindow) mainWindow.webContents.send('stream:log', { accountId, log: msg });
     });
     proc.on('error', (err) => {
+      clearTimeout(startupTimer);
       console.error('[推流] FFmpeg启动失败:', err.message);
       if (mainWindow) mainWindow.webContents.send('stream:error', { accountId, error: err.message });
       delete streamProcesses[accountId];
+      const egress = mediaEgresses[accountId];
+      if (egress) { egress.close().catch(error => console.error('[媒体出口] 清理失败:', error.message)); delete mediaEgresses[accountId]; }
     });
     proc.on('close', (code) => {
       console.log(`[推流] 房间 ${accountId} FFmpeg退出，代码 ${code}`);
@@ -2430,7 +2464,8 @@ async function startStreamNow(accountId, payload) {
         return;
       }
       delete streamRetries[accountId];
-      if (mainWindow) mainWindow.webContents.send('stream:stopped', { accountId, code, duplicate: _dup });
+      const failure = startupFailure || (mediaEgresses[accountId] && mediaEgresses[accountId].error) || (!outputStarted ? (_stderrBuf.trim().split('\n').slice(-4).join(' ') || 'FFmpeg 未输出视频即退出，code=' + code) : '');
+      if (mainWindow) mainWindow.webContents.send('stream:stopped', { accountId, code, duplicate: _dup, error: failure });
       // v1.12.50 清理签名管道
       if (proc2) { try { proc2.kill('SIGKILL'); } catch (e) {} }
       if (transform) { try { transform.destroy(); } catch (e) {} }
@@ -2448,8 +2483,8 @@ async function startStreamNow(accountId, payload) {
       }
     });
     proc.stdin.on('error', () => {});
-    if (mainWindow) mainWindow.webContents.send('stream:log', { accountId, log: '[推流] 推流已启动（开始向直播间推流）' });
-    return { success: true, message: '推流已启动' };
+    sendToUI('stream:log', { accountId, log: '[推流] 进程已创建，正在连接并等待视频输出' });
+    return { success: true, connecting: true, message: '正在连接' };
   } catch (e) { return { success: false, error: e.message }; }
   } finally { delete streamStarting[accountId]; }
 }
@@ -2575,7 +2610,7 @@ async function closeRoomViaApi(accountId, roomId, streamId) {
       const name = info && info.name ? String(info.name).replace(/^@/, '') : '';
       tempWin = createAccountWindow(accountId, { title: '单端关房', width: 480, height: 360, show: false });
       await injectSavedCookies(accountId, tempWin.webContents.session);
-      await tempWin.loadURL('https://www.tiktok.com/@' + encodeURIComponent(name) + '/live', { userAgent: UA });
+      await loadAccountPage(tempWin, 'https://www.tiktok.com/@' + encodeURIComponent(name) + '/live', { userAgent: UA });
       await sleep(6000);
       capWin = tempWin;
     } catch (e) { console.log('[推流] 关房临时窗口失败:', e.message); }
@@ -3787,7 +3822,7 @@ async function startMonitor(accountId, accountName) {
     // v1.12.30 小电视改回观众页（直播画面视角，用户要看直播间内容）；数据从该页 DOM 获取（在线/点赞/公屏评论/进场/礼物）
     console.log('[监控] 房间', accountId, '步骤3 注入Cookie完成，异步加载观众页');
     // v1.15.23 页面加载不等待（fire-and-forget）：浮窗立即弹出，页面/DOM 数据后台就绪（原来 await 20 秒 → 用户以为浮窗打不开）
-    win.loadURL('https://www.tiktok.com/@' + encodeURIComponent(String(accountName || '').replace(/^@/, '')) + '/live', { userAgent: UA })
+    loadAccountPage(win, 'https://www.tiktok.com/@' + encodeURIComponent(String(accountName || '').replace(/^@/, '')) + '/live', { userAgent: UA })
       .catch(e => console.error('[监控] 页面加载:', e.message));
     // v1.15.52 数据源窗口加载监控：加载完成日志 + preload 报错捕获 + 15s 超时强制重载（观众页偶发卡住→preload 无数据→在线/进场/评论全 0）
     // v1.15.54 preload 失效兜底：主进程 executeJavaScript 每 2s 直接读 body 文本 → 复用 parseDomEvents（preload 死也抓在线/进场/评论）

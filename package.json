@@ -1,6 +1,6 @@
 {
   "name": "tk-tools",
-  "version": "1.15.60",
+  "version": "1.0.2",
   "private": true,
   "description": "TikTok 直播工作台 Windows 开发工程",
   "main": "src/main.js",
@@ -11,7 +11,12 @@
     "start": "node scripts/start.cjs",
     "dev": "node scripts/start.cjs --dev",
     "setup:windows": "node scripts/setup-windows.cjs",
-    "check": "node scripts/check.cjs"
+    "check": "node scripts/check.cjs",
+    "build:win": "node scripts/build-windows.cjs",
+    "license:init": "node scripts/license-issuer.cjs --init",
+    "license:issue": "node scripts/license-issuer.cjs",
+    "test:license": "node --test tests/license.test.cjs",
+    "test:network": "node --test tests/network.test.cjs"
   },
   "dependencies": {
     "fluent-ffmpeg": "2.1.3",
@@ -20,6 +25,7 @@
     "ws": "8.22.0"
   },
   "devDependencies": {
-    "electron": "28.3.3"
+    "electron": "28.3.3",
+    "electron-builder": "26.15.3"
   }
 }

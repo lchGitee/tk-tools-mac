@@ -1,0 +1,43 @@
+{
+  "appId": "app.tktools.desktop",
+  "productName": "tk-tools",
+  "electronVersion": "28.3.3",
+  "directories": {
+    "output": "dist"
+  },
+  "files": [
+    "src/**/*",
+    "package.json"
+  ],
+  "asar": true,
+  "asarUnpack": [
+    "src/ffmpeg/**/*",
+    "src/obs-portable/**/*",
+    "src/xray-portable/**/*",
+    "src/curl/**/*"
+  ],
+  "npmRebuild": false,
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      }
+    ],
+    "icon": "build/app.ico",
+    "signExecutable": false,
+    "artifactName": "tk-tools-Setup-${version}-x64.exe"
+  },
+  "nsis": {
+    "installerIcon": "build/app.ico",
+    "uninstallerIcon": "build/app.ico",
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true
+  },
+  "copyright": ""
+}

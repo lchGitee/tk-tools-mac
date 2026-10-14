@@ -1031,6 +1031,265 @@ body.monitor-mode .mon-panel-tv { max-height: 42vh; aspect-ratio: 9/16; }
 .text-danger { color: var(--danger); }
 .text-success { color: var(--success); }
 .font-mono { font-family: var(--mono); }
+
+/* ===== 视觉升级：仅覆盖表现层，保留状态显隐、窗口拖拽与画布坐标 ===== */
+:root {
+  --bg: #f0f4f7;
+  --surface: #ffffff;
+  --surface-hover: #f3f7f9;
+  --border: #d6e1e7;
+  --border-light: #e5edf1;
+  --text-primary: #18303e;
+  --text-secondary: #526c7b;
+  --text-tertiary: #738895;
+  --primary: #087f8c;
+  --primary-hover: #066674;
+  --primary-light: #e5f5f5;
+  --primary-dark: #076571;
+  --success: #138568;
+  --success-light: #eaf7f1;
+  --warning: #bd7515;
+  --warning-light: #fff7e7;
+  --danger: #cf4052;
+  --danger-light: #fff0f2;
+  --info: #2878ae;
+  --topbar-bg: #102c3c;
+  --topbar-text: #e1edf2;
+  --sidebar-bg: #f9fbfc;
+  --radius-sm: 7px;
+  --radius: 12px;
+  --radius-lg: 18px;
+  --shadow-sm: 0 2px 5px rgba(20, 53, 69, .035);
+  --shadow: 0 6px 22px rgba(20, 53, 69, .07);
+  --shadow-lg: 0 20px 64px rgba(13, 40, 54, .19);
+  --font: 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', -apple-system, sans-serif;
+}
+body { min-width: 1080px; background: var(--bg); line-height: 1.6; }
+::selection { background: #bee9e9; color: #123b47; }
+::-webkit-scrollbar-thumb { background: #bdcdd6; border: 2px solid transparent; background-clip: padding-box; border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background-color: #91a9b6; }
+button, input, select, textarea { accent-color: var(--primary); }
+button:focus-visible, .nav-item:focus-visible, .stream-tab:focus-visible {
+  outline: 2px solid var(--primary); outline-offset: 3px;
+}
+.topbar { height: 72px; padding: 0 28px; gap: 12px; border-bottom: 1px solid #244756; box-shadow: 0 3px 16px #102c3c12; }
+.logo-wrap { gap: 13px; flex-shrink: 0; }
+.logo-icon { width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(145deg, #39d5ce, #087f8c); box-shadow: inset 0 1px 0 #ffffff55; }
+.logo-title { font-size: 18px; letter-spacing: .6px; }
+.logo-sub { color: #a5bdc8; font-size: 11px; }
+.topbar-btn { height: 38px; border-radius: 9px; padding: 0 14px; border-color: #ffffff26; background: #ffffff05; }
+.topbar-btn:hover { background: #ffffff10; border-color: #ffffff45; }
+.topbar-btn.primary { background: #0b929c; border-color: #27abb1; box-shadow: 0 3px 12px #00000015; }
+.topbar-btn.primary:hover { background: #0c7b88; }
+.layout { min-height: calc(100vh - 72px); }
+.sidebar { width: 216px; padding: 24px 12px 92px; border-right-color: var(--border); gap: 4px; }
+.nav-item { padding: 13px 14px; border-left: 3px solid transparent; border-radius: 11px; font-size: 13px; }
+.nav-item.active { border-left-color: var(--primary); background: var(--primary-light); }
+.nav-item .badge { padding: 2px 8px; background: var(--primary-dark); }
+.sidebar-divider { margin: 20px 8px; }
+.overview-panel { padding: 0 4px; }
+.overview-title { color: var(--text-secondary); margin-bottom: 14px; letter-spacing: 1px; }
+.overview-title .link { font-size: 12px; }
+.overview-card { padding: 14px; margin-bottom: 12px; box-shadow: var(--shadow-sm); border-color: var(--border-light); }
+.overview-row { align-items: center; gap: 6px; padding: 3px 0 7px; }
+.overview-value { font-variant-numeric: tabular-nums; letter-spacing: -.4px; }
+.overview-sub { line-height: 1.7; }
+.overview-alert { border-color: #ecd8ab; color: #81591e; }
+main.main { padding: 28px 30px 76px; }
+.page-header { margin-bottom: 24px; gap: 20px; flex-wrap: wrap; }
+.page-title { font-size: 26px; letter-spacing: -.6px; line-height: 1.35; }
+.page-subtitle { margin-top: 7px; }
+.account-grid, .node-list { gap: 20px; }
+.account-card { border-color: var(--border); box-shadow: var(--shadow-sm); }
+.account-card:hover { box-shadow: var(--shadow); }
+.metrics-bar { padding: 22px 20px 18px; background: linear-gradient(180deg, #f7fbfc, #ffffff); gap: 12px; }
+.metric-value { font-size: 28px; letter-spacing: -.6px; }
+.metric-label { margin-top: 7px; font-size: 11px; }
+.card-actions-bar { padding: 18px 20px; gap: 12px; }
+.actions-row { gap: 9px; }
+.actions-row + .actions-row { margin-top: 12px; }
+.action-group-label { color: var(--text-secondary); letter-spacing: .3px; }
+.actions-row-tools .action-group-label { margin-left: 10px; }
+.btn { border-radius: 9px; transition: background-color .15s, border-color .15s, box-shadow .15s; }
+.btn-primary, .btn-main { box-shadow: 0 3px 8px #087f8c1a; }
+.btn-main { padding: 0 22px; border-radius: 10px; }
+.btn-secondary { background: #eaf2f5; border-color: #ccdde5; color: #355665; box-shadow: none; }
+.btn-secondary:hover { background: #dfecef; border-color: #a7c4cf; }
+.btn-ghost { background: #ffffff; border-color: var(--border); color: var(--text-secondary); box-shadow: none; }
+.btn-ghost:hover { background: var(--surface-hover); border-color: #a7c4cf; color: var(--text-primary); }
+.btn-success:hover { background: #0e6c54; }
+.btn-danger:hover { background: #b52e41; }
+.btn-main.btn-success, .btn-main.btn-danger { box-shadow: var(--shadow-sm); }
+.btn-sm { border-radius: 7px; }
+.status-tag { border-radius: 7px; padding: 4px 9px; }
+.room-badge { background: var(--primary-light); color: var(--primary-dark); }
+.push-video-tag, .signer-badge { background: #f3f7f9; border-color: var(--border); }
+.account-input, .form-input, .prop-input, .engine-select, .select, .textarea, .mon-panel-send input {
+  background: #fbfdfe; color: var(--text-primary); border-color: var(--border); border-radius: 9px;
+  transition: border-color .15s, box-shadow .15s;
+}
+.account-input:focus, .form-input:focus, .prop-input:focus, .engine-select:focus, .select:focus, .textarea:focus, .mon-panel-send input:focus {
+  border-color: var(--primary); box-shadow: 0 0 0 3px #087f8c15;
+}
+input::placeholder, textarea::placeholder { color: var(--text-tertiary); }
+.form-label { margin-bottom: 8px; }
+.form-group { margin-bottom: 20px; }
+.form-desc, .hint-text { line-height: 1.8; }
+.form-actions { padding-top: 16px; border-top: 1px solid var(--border-light); flex-wrap: wrap; }
+.stream-info { margin: 0 20px 18px; padding: 16px 18px; background: var(--success-light); border-color: #c3e7d8; }
+.stream-info-title, .monitor-stream .title { color: #1a634d; }
+.stream-info-meta, .monitor-stream .code { color: #36705d; }
+.feed-section { padding: 4px 20px 20px; }
+.feed-header { margin-bottom: 12px; }
+.feed-box, .mon-panel-feed { background: #f6f9fb; border-color: var(--border-light); border-radius: 11px; }
+.feed-item { padding: 9px 0; border-bottom: 1px solid var(--border-light); }
+.feed-item:last-child { border-bottom: none; }
+.feed-type.comment { background: #e3f3f3; color: #076571; }
+.feed-type.enter { background: #e5f0fa; color: #286491; }
+.auto-interact { padding: 16px 20px; background: #f8fbfc; }
+.node-card, .add-node-form, .assign-list { border-color: var(--border); box-shadow: var(--shadow-sm); }
+.node-card { padding: 22px; border-radius: var(--radius-lg); }
+.node-info { min-width: 0; overflow-wrap: anywhere; }
+.node-actions { flex-wrap: wrap; justify-content: flex-end; }
+.node-name { font-size: 17px; margin-bottom: 7px; }
+.node-speed { flex-wrap: wrap; gap: 8px 20px; }
+.add-node-form { padding: 26px; }
+.assign-row { padding: 18px 22px; }
+/* 编辑器只调整外部面板，保留预览画布尺寸与图层操作区域。 */
+.editor-layout { border: 1px solid var(--border); border-radius: 16px; background: #eaf0f4; overflow: hidden; }
+.editor-left { width: 160px; padding-top: 20px; }
+.editor-room-item { margin: 4px 8px; padding: 12px 10px; border-radius: 9px; }
+.editor-center { padding: 20px; }
+.editor-header { gap: 16px; flex-wrap: wrap; }
+.editor-title { font-size: 22px; }
+.editor-meta { margin-top: 5px; line-height: 1.8; }
+.stream-panel { padding: 18px; box-shadow: var(--shadow-sm); }
+.stream-panel-header { gap: 10px; flex-wrap: wrap; }
+.stream-stats { gap: 14px; }
+.stream-stat { padding: 8px 0; min-width: 0; overflow-wrap: anywhere; }
+.canvas-area { gap: 24px; overflow-x: auto; justify-content: flex-start; }
+.canvas-frame { flex-shrink: 0; margin-inline: auto; }
+.canvas-preview { background: #102431; box-shadow: 0 12px 32px #102c3c24; }
+.canvas-preview .upload-hint { background: #087f8ce8; }
+.canvas-label { color: var(--text-secondary); }
+.editor-right { width: 290px; padding: 18px 14px; }
+.panel-box { padding: 16px; box-shadow: var(--shadow-sm); }
+.layer-item { border-radius: 8px; padding: 10px; }
+.layer-item.active { box-shadow: inset 0 0 0 1px #b9dddd; }
+.prop-label { color: var(--text-secondary); margin-bottom: 5px; }
+.volume-slider { accent-color: var(--primary); }
+.modal-overlay { background: #102c3c70; backdrop-filter: blur(5px); padding: 20px; }
+.modal { border: 1px solid #e0eaee; max-height: calc(100vh - 64px); }
+.modal-header { padding: 24px; background: #f8fbfc; gap: 20px; }
+.modal-title { font-size: 20px; letter-spacing: -.3px; }
+.modal-subtitle { line-height: 1.7; }
+.modal-close { background: #eaf1f4; color: var(--text-secondary); flex-shrink: 0; }
+.modal-body { padding: 24px; }
+.modal-footer { padding: 18px 24px; background: #f8fbfc; flex-wrap: wrap; }
+.monitor-stream { background: var(--success-light); border-color: #c3e7d8; }
+.monitor-metric .v { font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+.mon-panel { border-color: var(--border); border-radius: 15px; box-shadow: var(--shadow-lg); }
+.mon-panel-header { padding: 12px; background: #edf5f7; border-bottom-color: #d5e5eb; }
+.mon-panel-icon { color: var(--text-secondary); }
+.mon-panel-icon:hover { background: #dbe9ee; }
+.mon-panel-body { padding: 14px 12px; gap: 12px; }
+.mon-panel-metrics { padding: 12px 0; background: #f6fafb; border: 1px solid var(--border-light); border-radius: 10px; }
+.mon-panel-actions { flex-wrap: wrap; gap: 7px; }
+.mon-panel-send input { min-width: 0; }
+.mon-quick { gap: 6px; }
+.mon-quick .q { border-color: #c4e3e3; padding: 4px 9px; }
+.mon-quick .q:hover { background: #d4eded; }
+.mon-panel .btn-ghost:hover { background: var(--surface-hover); }
+/* 独立监控窗可窄至 400px，不能继承工作台的最小宽度。 */
+body.monitor-mode { min-width: 0; background: var(--surface); }
+body.monitor-mode .mon-panel-header { padding: 14px 12px; }
+.log-bar { height: 40px; background: #102c3c; padding: 0 24px; color: #afc4ce; border-top-color: #244756; }
+.log-bar .log-label, .log-bar .log-content .time { color: #a3bbc7; }
+.log-bar .btn-ghost { background: #ffffff0c; border-color: #ffffff25; color: #d4e4ec; }
+.log-bar .btn-ghost:hover { background: #ffffff18; }
+.log-progress { color: #5cddbb; }
+.empty-state { padding: 84px 24px; background: #ffffff; border: 1px dashed #c9dce5; border-radius: 18px; }
+.empty-state .icon { width: 76px; height: 76px; background: var(--primary-light); color: var(--primary); border-radius: 22px; margin-bottom: 22px; }
+.empty-state .title { font-size: 18px; color: var(--text-primary); margin-bottom: 9px; }
+.empty-state .desc { line-height: 1.8; }
+.toast-container { top: 88px; }
+.toast { border-color: var(--border); border-radius: 12px; }
+#helpBtn { left: 24px !important; bottom: 60px !important; background: #ffffff !important; color: var(--primary-dark) !important; border-color: var(--border) !important; padding: 11px 15px !important; border-radius: 10px !important; box-shadow: var(--shadow-sm) !important; }
+/* 激活页使用深色卡片，消息颜色仍由原授权逻辑控制。 */
+#licenseOverlay { background: radial-gradient(ellipse at 20% 20%, #175565, transparent 55%), linear-gradient(140deg, #0b2433, #102c3c) !important; }
+#licenseOverlay > div { width: 460px !important; padding: 40px 36px 32px !important; background: #133343 !important; border-color: #335867 !important; border-radius: 22px !important; box-shadow: 0 28px 80px #00000040 !important; }
+#licenseOverlay > div > div:first-child { color: #6be0d6 !important; font-size: 28px !important; letter-spacing: .5px !important; }
+#licCode { background: #0c2635 !important; border-color: #3a6070 !important; border-radius: 11px !important; }
+#licCode:focus { border-color: #6be0d6 !important; box-shadow: 0 0 0 3px #6be0d615; }
+#licBtn { background: linear-gradient(100deg, #67d9ca, #5abed2) !important; color: #0c3040 !important; border-radius: 11px !important; }
+#licBtn:disabled { opacity: .6; cursor: not-allowed; }
+@media (max-width: 1280px) {
+  .topbar { padding-inline: 20px; gap: 9px; }
+  .topbar-btn { padding-inline: 11px; }
+  .sidebar { width: 190px; padding-inline: 10px; }
+  main.main { padding-inline: 20px; }
+  .editor-left { width: 130px; }
+  .editor-right { width: 260px; padding-inline: 10px; }
+  .stream-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ===== v1 字体与排版收敛：隐藏冗余版本标签，不改变其更新逻辑 ===== */
+:root {
+  --font: 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', -apple-system, sans-serif;
+  --mono: 'Cascadia Mono', 'Consolas', 'SFMono-Regular', monospace;
+}
+body { font-size: 13px; line-height: 1.65; }
+#appVersionTag { display: none; }
+.logo-title { font-size: 18px; font-weight: 600; letter-spacing: .2px; line-height: 1.4; }
+.topbar { gap: 14px; }
+.topbar-btn { font-weight: 500; }
+.page-title { font-size: 25px; font-weight: 600; letter-spacing: -.3px; }
+.page-subtitle { font-size: 12px; line-height: 1.75; }
+.nav-item { font-size: 13px; }
+.overview-label { font-size: 12px; }
+.overview-sub { font-size: 11px; overflow-wrap: anywhere; }
+.overview-value { font-weight: 600; font-variant-numeric: tabular-nums; }
+.metrics-bar { padding: 20px 18px 16px; }
+.metric { min-width: 0; }
+.metric-value { font-size: 26px; font-weight: 600; line-height: 1.3; }
+.metric-label { margin-top: 5px; font-size: 12px; }
+.status-indicator { line-height: 1.65; }
+.account-input { font-size: 13px; }
+.actions-row-tools { row-gap: 10px; }
+.actions-row-tools .action-group-label { font-size: 11px; font-weight: 600; }
+.btn { font-weight: 500; }
+.btn-main { font-size: 13px; font-weight: 600; }
+.form-label, .panel-title, .feed-title { font-weight: 600; }
+.form-input, .textarea { font-size: 13px; }
+.textarea { line-height: 1.8; padding: 12px 14px; }
+.form-desc { font-size: 12px; line-height: 1.85; overflow-wrap: anywhere; }
+.hint-text { line-height: 1.8; overflow-wrap: anywhere; }
+.form-group:last-child { margin-bottom: 0; }
+.node-name, .assign-account .name { font-weight: 600; }
+.node-meta, .node-ip { line-height: 1.8; overflow-wrap: anywhere; }
+.node-card { align-items: flex-start; }
+.assign-account .name { overflow-wrap: anywhere; }
+.assign-select { max-width: 45%; }
+.editor-title { font-size: 21px; font-weight: 600; }
+.editor-room-item .rname, .layer-item .lname { overflow-wrap: anywhere; min-width: 0; }
+.prop-row { gap: 10px; margin-bottom: 10px; }
+.prop-input { font-size: 12px; font-variant-numeric: tabular-nums; }
+.modal-title { font-size: 19px; font-weight: 600; line-height: 1.5; }
+.modal-subtitle { font-size: 12px; }
+.modal-body { line-height: 1.8; overflow-wrap: anywhere; }
+.modal-footer { gap: 10px; }
+.monitor-metric .v { font-weight: 600; }
+.monitor-metric .l { font-size: 11px; }
+.mon-panel-metrics .monitor-metric { min-width: 0; }
+.mon-panel-actions .btn { padding-inline: 10px; }
+.mon-panel-feed { line-height: 1.75; }
+.mon-panel-send input { font-size: 12px; }
+.feed-content { overflow-wrap: anywhere; }
+.empty-state .title { font-size: 17px; font-weight: 600; }
+.empty-state .desc { font-size: 12px; }
+
+/* 应用图标与 Windows 打包资源保持一致，仅替换顶栏标识样式。 */
+.logo-icon { background: url("assets/app-icon.png") center / contain no-repeat; color: transparent; box-shadow: none; }
 </style>
 </head>
 <body>
@@ -1040,13 +1299,13 @@ body.monitor-mode .mon-panel-tv { max-height: 42vh; aspect-ratio: 9/16; }
   <div style="width:420px; max-width:92vw; background:#16223a; border:1px solid #2b3a55; border-radius:16px; padding:36px 34px 30px; box-shadow:0 18px 60px rgba(0,0,0,.55); text-align:center;">
     <div style="font-size:34px; font-weight:800; color:#4ade80; letter-spacing:2px; margin-bottom:4px;">TikTok 直播工作台</div>
     <div style="font-size:13px; color:#8fa3c2; margin-bottom:26px;">软件激活 · 卡密验证</div>
-    <div style="text-align:left; font-size:13px; color:#c3d0e5; margin-bottom:8px;">请输入卡密（格式：TK-XXXX-XXXX-XXXX）</div>
-    <input id="licCode" type="text" spellcheck="false" autocomplete="off" style="width:100%; box-sizing:border-box; padding:12px 14px; font-size:16px; letter-spacing:2px; background:#0d1526; color:#e8eef8; border:1px solid #33445f; border-radius:8px; outline:none;" placeholder="TK-XXXX-XXXX-XXXX" />
+    <div style="text-align:left; font-size:13px; color:#c3d0e5; margin-bottom:8px;">请粘贴为本机签发的授权码</div>
+    <input id="licCode" type="text" spellcheck="false" autocomplete="off" style="width:100%; box-sizing:border-box; padding:12px 14px; font-size:16px; letter-spacing:2px; background:#0d1526; color:#e8eef8; border:1px solid #33445f; border-radius:8px; outline:none;" placeholder="TK1.…" maxlength="4096" />
     <button id="licBtn" style="width:100%; margin-top:14px; padding:12px 0; font-size:16px; font-weight:700; color:#0b1220; background:linear-gradient(90deg,#4ade80,#22d3ee); border:none; border-radius:8px; cursor:pointer;">激 活</button>
     <div id="licMsg" style="margin-top:12px; min-height:20px; font-size:13px; color:#f87171;"></div>
     <div style="margin-top:18px; padding-top:16px; border-top:1px dashed #2b3a55; font-size:12px; color:#6f82a0;">
       本机机器码：<span id="licMachine" style="font-family:Consolas,monospace; color:#93a7c6; user-select:text;">…</span>
-      <div style="margin-top:6px; color:#5a6d8a;">该卡密绑定当前电脑，复制软件到其他电脑无法使用</div>
+      <div style="margin-top:6px; color:#5a6d8a;">将本机机器码发给签发方，获取专属授权码</div>
     </div>
   </div>
 </div>
@@ -1057,7 +1316,7 @@ body.monitor-mode .mon-panel-tv { max-height: 42vh; aspect-ratio: 9/16; }
     <div class="logo-icon">TT</div>
     <div class="logo-text">
       <span class="logo-title">TikTok直播工作台</span>
-      <span class="logo-sub" id="appVersionTag">版本加载中...</span>
+      <span class="logo-sub" id="appVersionTag">v1</span>
     </div>
   </div>
   <div class="topbar-spacer"></div>
@@ -1177,7 +1436,7 @@ body.monitor-mode .mon-panel-tv { max-height: 42vh; aspect-ratio: 9/16; }
 // 而 1240 行 syncNodesFromMainOnBoot IIFE 提前访问 → TDZ ReferenceError → 前端脚本整体中断 → 软件全部功能失效）
 const isElectron = !!(window.tkAPI && window.tkAPI.isElectron && window.tkAPI.isElectron());
 // ============================================================
-// 卡密授权登录遮罩 v1.14.0（本地验证 / 一卡一机 / 永久有效）
+// 离线授权登录遮罩（签名验证 / 机器绑定 / 永久有效）
 // ============================================================
 (function licenseGate() {
   const ov = document.getElementById('licenseOverlay');
@@ -1192,11 +1451,11 @@ const isElectron = !!(window.tkAPI && window.tkAPI.isElectron && window.tkAPI.is
     ov.style.display = 'flex';
     if (st.reason === 'machine_mismatch') {
       msg.style.color = '#f0a64a';
-      msg.textContent = '此副本已绑定其他电脑，请输入有效卡密重新激活';
+      msg.textContent = '授权码属于其他电脑，请获取本机授权码';
     }
     btn.onclick = () => {
       const code = (input.value || '').trim();
-      if (!code) { msg.style.color = '#f87171'; msg.textContent = '请输入卡密'; return; }
+      if (!code) { msg.style.color = '#f87171'; msg.textContent = '请粘贴授权码'; return; }
       btn.disabled = true; btn.textContent = '验证中…';
       window.tkAPI.licenseActivate({ code }).then(r => {
         if (r && r.ok) {
@@ -1205,8 +1464,10 @@ const isElectron = !!(window.tkAPI && window.tkAPI.isElectron && window.tkAPI.is
           setTimeout(() => { ov.style.display = 'none'; }, 700);
         } else {
           btn.disabled = false; btn.textContent = '激 活';
-          const txt = r && r.reason === 'format' ? '卡密格式不对（TK-XXXX-XXXX-XXXX）'
-            : r && r.reason === 'invalid' ? '卡密无效，请检查后重新输入'
+          const txt = r && r.reason === 'format' ? '授权码格式不正确'
+            : r && r.reason === 'invalid' ? '授权码无效，请检查后重新输入'
+            : r && r.reason === 'machine_mismatch' ? '授权码属于其他电脑'
+            : r && r.reason === 'storage_error' ? '无法读写授权文件，请检查目录权限'
             : '激活失败，请重试';
           msg.style.color = '#f87171';
           msg.textContent = '❌ ' + txt;
@@ -1244,7 +1505,7 @@ let state = loadState();
   if (!isElectron || !window.tkAPI || !window.tkAPI.getNodes) return;
   window.tkAPI.getNodes().then(res => {
     try {
-      if (!res || !Array.isArray(res.nodes) || !res.nodes.length) return;
+      if (!res || !Array.isArray(res.nodes)) return;
       const mainNodes = res.nodes.map(n => ({
         id: n.id,
         name: n.name || ('节点' + n.id),
@@ -1254,9 +1515,9 @@ let state = loadState();
         testResult: '',
         assignedAccounts: 0,
       }));
-      const existing = new Set(state.nodes.map(n => n.id));
-      let changed = false;
-      mainNodes.forEach(n => { if (!existing.has(n.id)) { state.nodes.push(n); changed = true; } });
+      // nodes.json 是实际出口的事实源，同 ID 的旧链接及已删除节点也必须同步。
+      let changed = JSON.stringify(state.nodes.map(n => ({ id: n.id, name: n.name, url: n.url }))) !== JSON.stringify(mainNodes.map(n => ({ id: n.id, name: n.name, url: n.url })));
+      state.nodes = mainNodes;
       const maxId = mainNodes.reduce((m, n) => Math.max(m, n.id + 1), 1);
       if (maxId > state.nextNodeId) { state.nextNodeId = maxId; changed = true; }
       if (changed) { saveState(); render(); }
@@ -1272,7 +1533,7 @@ function loadState() {
     const parsedV2 = savedV2 ? JSON.parse(savedV2) : null;
     const base = mergeState(parsed, parsedV2);
     // v1.12.9 重启后主进程监控/推流不会自动恢复：重置为未启动状态，避免"监控窗口"假状态导致实时动态无数据
-    (base.accounts || []).forEach(a => { a.monitorRunning = false; a.streaming = false; if (a.status === 'streaming' || a.status === 'live') a.status = 'connected'; });
+    (base.accounts || []).forEach(a => { a.monitorRunning = false; a.streaming = false; a.connecting = false; a.starting = false; if (a.status === 'streaming' || a.status === 'live') a.status = 'connected'; });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(base));
     return base;
   } catch (e) { console.warn('加载状态失败', e); }
@@ -1308,6 +1569,8 @@ function mergeState(parsed, parsedV2) {
       a.liveStartedAt = null;
       // v1.9.4 重启后强制重置运行态：推流/直播状态是运行时事实，不能从上次残留（避免假"直播中"）
       a.streaming = false;
+      a.connecting = false;
+      a.starting = false;
       a.delayed = false; // v1.13.11 自动推流等待态不跨重启
       a.delayedUntil = null;
       a.retrying = false; // v1.13.12 duplicate 重试态不跨重启
@@ -1619,11 +1882,11 @@ function renderAccountCard(acc) {
             <span>${statusText}</span>
             <span class="room-badge">${acc.roomName || ('房间 ' + acc.id)} · 独立窗口</span>
           </div>
-          <span class="status-tag ${acc.streaming ? 'live' : ''}">内置·${acc.streaming ? '推流中' : (acc.streamKey ? '已配置' : '未配置画面')}</span>
+          <span class="status-tag ${acc.streaming ? 'live' : ''}">内置·${acc.streaming ? '推流中' : (acc.connecting ? '连接中' : (acc.streamKey ? '已配置' : '未配置画面'))}</span>
           <input class="account-input" value="${acc.name}" placeholder="TikTok 账号名（不带 @）" onchange="updateAccountName(${acc.id}, this.value)">
           <button class="btn btn-primary btn-main" onclick="getStreamKey(${acc.id})">获取推流码</button>
-          <button class="btn ${acc.streaming ? 'btn-danger' : 'btn-success'} btn-main" onclick="toggleStream(${acc.id})">
-            ${acc.starting ? '正在启动推流…' : (acc.streaming ? '停止推流' : (acc.retrying ? '推流重试中…(点击取消)' : '开始内置推流'))}
+          <button class="btn ${(acc.streaming || acc.connecting) ? 'btn-danger' : 'btn-success'} btn-main" onclick="toggleStream(${acc.id})">
+            ${acc.starting ? '正在启动推流…' : (acc.streaming ? '停止推流' : (acc.connecting ? '连接中…(点击取消)' : (acc.retrying ? '推流重试中…(点击取消)' : '开始内置推流')))}
           </button>
           <select class="engine-select" onchange="setStreamEngine(${acc.id}, this.value)" title="推流引擎：FFmpeg=内置直推(已验证，推荐)；OBS=内置便携OBS(多素材/滤镜合成，隐藏运行)">
             <option value="ffmpeg" ${!acc.useOBS ? 'selected' : ''}>引擎:FFmpeg</option>
@@ -1739,7 +2002,7 @@ function renderPartnerView() {
         <div class="form-group">
           <label class="form-label">节点链接</label>
           <input class="form-input" placeholder="vless://、vmess:// 或 socks5://" id="partnerNodeUrl">
-          <div class="form-desc">v1.13.11 内置 xray 代理内核：vless://、vmess://、socks5:// 节点均可在软件内直接使用（无需桌面 v2/v2rayN）。保存节点后重启软件，软件自动用内置内核起本地代理（10888），页面/API 全部走节点。测速完整样本最多约 12 MiB；短时测速不代表持续开播带宽。</div>
+          <div class="form-desc">内置 xray 代理内核：vless://、vmess://、socks5:// 节点均可在软件内直接使用（无需桌面 v2/v2rayN）。保存节点后软件自动用内置内核起本地代理（10888），页面/API 全部走节点。测速完整样本最多约 12 MiB；短时测速不代表持续开播带宽。</div>
         </div>
         <div class="form-actions">
           <button class="btn btn-secondary" onclick="addPartnerNode(false)">保存节点</button>
@@ -1777,13 +2040,13 @@ function renderNodeView() {
     <div class="page-header">
       <div>
         <div class="page-title">节点与账号分配</div>
-        <div class="page-subtitle">NETWORK · v1.3 · 真实测试</div>
+        <div class="page-subtitle">NETWORK · 真实测试</div>
       </div>
       <button class="btn btn-secondary" onclick="navigate('mobile')">返回控制台</button>
       <button class="btn btn-primary" onclick="testAllNodes()" style="margin-left:8px">测试全部节点</button>
     </div>
     <div style="font-size:12px;color:var(--text-secondary);line-height:1.7;margin-bottom:16px">
-      v1.13.11 本软件内置 xray 代理内核（不依赖桌面 v2/v2rayN）：保存 vless/vmess/socks5 节点后，重启软件即自动用内置内核起本地代理（10888），小电视/监控/后台页/API 全部走节点。无节点时直连（推流本就直连）。换电脑只需把节点链接重新粘贴保存即可正常工作。
+      本软件内置 xray 代理内核（不依赖桌面 v2/v2rayN）：保存 vless/vmess/socks5 节点后，重启软件即自动用内置内核起本地代理（10888），小电视/监控/后台页/API 全部走节点。无节点时直连（推流本就直连）。换电脑只需把节点链接重新粘贴保存即可正常工作。
     </div>
 
     <div class="add-node-form">
@@ -1938,8 +2201,8 @@ function renderEditorView() {
             </div>
             <button class="btn btn-secondary btn-sm" style="padding:0 8px" onclick="manualStreamKey(${acc.id})" title="手机 App 获取推流码后手动填写">手动填推流码</button>
             <button class="btn btn-secondary btn-sm" style="padding:0 8px" onclick="regetStreamKey(${acc.id})" title="这场直播结束后重新获取新的推流码（每场直播推流码不同）">重新获取推流码</button>
-            <button class="btn ${acc.streaming ? 'btn-danger' : 'btn-primary'}" onclick="toggleStream(${acc.id})">
-              ${acc.streaming ? '停止推流' : '开始推流'}
+            <button class="btn ${(acc.streaming || acc.connecting) ? 'btn-danger' : 'btn-primary'}" onclick="toggleStream(${acc.id})">
+              ${acc.streaming ? '停止推流' : (acc.connecting ? '连接中…(点击取消)' : '开始推流')}
             </button>
           </div>
           <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;font-family:var(--mono)">
@@ -2095,7 +2358,9 @@ function loginAccount(id) {
     // 桌面版：为该房间新建独立登录窗口（每账号独立会话，登录后自动抓取 Cookie）
     showToast('正在为 ' + (acc.roomName || ('房间 ' + id)) + ' 新建独立登录窗口...', 'info');
     addLog('打开独立登录窗口: ' + (acc.roomName || ('房间 ' + id)) + (acc.name ? ' @' + acc.name : ''));
-    window.tkAPI.openTikTokLogin({ accountId: id, accountName: acc.name });
+    window.tkAPI.openTikTokLogin({ accountId: id, accountName: acc.name }).then(result => {
+      if (!result.success) { addLog('登录页面加载失败: ' + result.error); showToast('登录页面加载失败: ' + result.error, 'error'); }
+    }).catch(error => { addLog('登录失败: ' + error.message); showToast('登录失败: ' + error.message, 'error'); });
 
     // 监听登录态变化（Cookie 自动抓取成功后回写）
     if (!window._loginStateBound) {
@@ -2489,6 +2754,8 @@ async function startRealStream(acc) {
     return false;
   }
 
+  bindStreamEvents();
+
   // 检查FFmpeg
   const ffmpegStatus = await window.tkAPI.checkFFmpeg();
   if (!ffmpegStatus.available) {
@@ -2536,6 +2803,8 @@ async function startRealStream(acc) {
   const sceneVideos = (getScene(acc.id) || { layers: [] }).layers || [];
   const videoFilePaths = acc.pushVideo ? [acc.pushVideo] : sceneVideos.filter(l => l.type === 'video' && l.filePath).map(l => l.filePath);
 
+  acc._streamStartStopped = false;
+  acc.connecting = true;
   const result = await window.tkAPI.startStream({
     accountId: acc.id,
     rtmpUrl: rtmpUrl,
@@ -2545,12 +2814,17 @@ async function startRealStream(acc) {
   });
 
   if (!result.success) {
+    acc.connecting = false;
     showToast('推流启动失败: ' + result.error, 'error');
     addLog('推流失败: ' + result.error);
     return false;
   }
 
+  if (acc._streamStartStopped) return false;
+
   // v1.13.12 立即试探推流（不再固定等待）：duplicate（手机推流权未释放）时主进程自动 10 秒重试，前端按钮显示"推流重试中…"
+  // 启动响应只代表进程建立，真正输出由日志事件确认。
+  acc.connecting = !!result.connecting && !acc.streaming;
   acc.retrying = false;
   acc.delayed = false;
   acc.delayedUntil = null;
@@ -2560,11 +2834,21 @@ async function startRealStream(acc) {
   // 启动帧推送
   startFramePushing(acc.id);
 
+  return true;
+}
+
+function bindStreamEvents() {
   // 监听推流日志
   if (!window._streamLogBound) {
     window.tkAPI.onStreamLog(({ accountId, log }) => {
+      addLog('房间 ' + accountId + ': ' + log.trim());
       if (log.includes('error') || log.includes('Error')) {
         console.warn('[FFmpeg]', log.trim());
+      }
+      // 自动重试的画布输入也要在连接阶段恢复，不能等首次输出后才送帧。
+      if (log.includes('进程已创建，正在连接')) {
+        const a = state.accounts.find(x => String(x.id) === String(accountId));
+        if (a) { a._streamStartStopped = false; a.connecting = true; a.retrying = false; startFramePushing(accountId); saveState(); render(); }
       }
       // v1.13.12 推流启动（含 duplicate 自动重试成功）→ 切回"停止推流"并恢复帧推送
       if (log.includes('推流已启动')) {
@@ -2572,6 +2856,7 @@ async function startRealStream(acc) {
         if (a) {
           a.retrying = false;
           a.delayed = false;
+          a.connecting = false;
           a.streaming = true;
           a.status = 'live';
           if (!a.liveStartedAt) a.liveStartedAt = Date.now();
@@ -2582,14 +2867,16 @@ async function startRealStream(acc) {
     });
     window.tkAPI.onStreamError(({ accountId, error }) => {
       const a = state.accounts.find(x => String(x.id) === String(accountId));
-      if (a) { a.delayed = false; a.delayedUntil = null; a.retrying = false; saveState(); }
+      if (a) { a._streamStartStopped = true; a.connecting = false; a.streaming = false; a.status = 'connected'; a.delayed = false; a.delayedUntil = null; a.retrying = false; stopFramePushing(accountId); saveState(); render(); }
       addLog('推流错误: ' + error);
       showToast('推流出错: ' + error, 'error');
     });
-    window.tkAPI.onStreamStopped(({ accountId, code, duplicate, retrying }) => {
+    window.tkAPI.onStreamStopped(({ accountId, code, duplicate, retrying, autoDown, user, error }) => {
       const a = state.accounts.find(x => String(x.id) === String(accountId));
       if (a) {
+        a._streamStartStopped = true;
         a.streaming = false;
+        a.connecting = false;
         a.delayed = false; // v1.13.11 自动推流被取消/结束 → 清等待状态
         a.delayedUntil = null;
         // v1.13.12 duplicate 自动重试中：按钮切"推流重试中…(点击取消)"，不弹失败长提示
@@ -2604,7 +2891,7 @@ async function startRealStream(acc) {
         a.status = 'connected';
         stopFramePushing(accountId);
         // v1.15.0 手机下播自动检测停止 → 前端同步清空推流码（主进程已清，双端一致）
-        if (data.autoDown) {
+        if (autoDown) {
           a.streamKey = ''; a.rtmpUrl = ''; a.roomId = '';
           addLog((a.roomName || ('房间 ' + a.id)) + ' 已识别手机端下播：推流码已清空');
           saveState();
@@ -2612,7 +2899,8 @@ async function startRealStream(acc) {
           return;
         }
         // v1.13.8 推流结束/掉流 → 明确失败原因，码保留显示（便于判断），不静默清空
-        let why = '推流已结束';
+        if (user) { saveState(); render(); return; }
+        let why = error || '推流已结束';
         if (duplicate) why = '推流被服务器拒绝（duplicate：同房间已有手机推流，手机断网后平台未释放推流权）。请等待 30-60 秒让平台释放推流权（或确认手机已完全断网），再重新获取当场新码后重试';
         else if (code === 4294957243 || code === -10053) why = '推流被服务器中止（连接断开：手机断网后房间可能已被平台结束，或网络波动；请确认另一设备是否仍能看到直播间，若已结束请重新开播抓当场新码）';
         else if (code === 4294967295 || code === -1) why = '推流异常退出（服务器关闭连接或素材解码错误）';
@@ -2629,7 +2917,6 @@ async function startRealStream(acc) {
     window._streamLogBound = true;
   }
 
-  return true;
 }
 
 function startFramePushing(accountId) {
@@ -2687,8 +2974,9 @@ function toggleStream(id) {
     saveState(); render();
     return;
   }
-  if (acc.streaming) {
+  if (acc.streaming || acc.connecting) {
     stopRealStream(id);
+    acc.connecting = false;
     acc.streaming = false;
     acc.status = 'connected';
     acc.liveStartedAt = null;
@@ -2712,13 +3000,13 @@ function toggleStream(id) {
       const ok = await startRealStream(acc);
       acc.starting = false;
       if (ok) {
-        acc.streaming = true;
-        acc.status = 'live';
-        acc.liveStartedAt = Date.now();
+        acc.streaming = !acc.connecting;
+        acc.status = acc.streaming ? 'live' : 'connected';
+        acc.liveStartedAt = acc.streaming ? Date.now() : null;
         saveState();
         render();
-        showToast('推流已启动（FFmpeg）', 'success');
-        addLog(roomLabel + ' 开始内置推流');
+        showToast(acc.connecting ? '正在连接推流服务器' : '推流已启动', acc.connecting ? 'info' : 'success');
+        addLog(roomLabel + (acc.connecting ? ' 正在连接推流服务器' : ' 已开始输出'));
       } else {
         saveState(); render();
       }
@@ -3108,7 +3396,14 @@ function addNode(test) {
 // v1.13.11 节点同步到主进程（内置 xray 代理使用第一个节点）
 async function syncNodesToMain() {
   if (isElectron && window.tkAPI && window.tkAPI.saveNodes) {
-    try { await window.tkAPI.saveNodes({ nodes: state.nodes.map(n => ({ id: n.id, name: n.name, link: n.url })) }); } catch (e) {}
+    try {
+      const result = await window.tkAPI.saveNodes({ nodes: state.nodes.map(n => ({ id: n.id, name: n.name, link: n.url })) });
+      if (!result.ok) throw new Error(result.error);
+      addLog('节点配置已同步，内置代理已更新');
+    } catch (error) {
+      addLog('内置代理启动失败: ' + error.message);
+      showToast('内置代理启动失败: ' + error.message, 'error');
+    }
   }
 }
 
@@ -3194,6 +3489,7 @@ function editNode(id) {
       node.status = 'disconnected';
       node.testResult = '';
       saveState();
+      syncNodesToMain();
       render();
       closeModal();
       showToast('节点已更新，请重新测试', 'info');
@@ -3209,6 +3505,7 @@ function deleteNode(id) {
     state.nodes = state.nodes.filter(n => n.id !== id);
     state.accounts.forEach(a => { if (a.nodeId === id) a.nodeId = null; });
     saveState();
+    syncNodesToMain();
     render();
     showToast('节点已删除', 'success');
     addLog('删除节点: ' + node.name);

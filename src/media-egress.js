@@ -9,7 +9,7 @@ const net = require('net');
 const tls = require('tls');
 
 class MediaEgress {
-  constructor({ proxy } = {}) {
+  constructor({ proxy, onLog = () => {} } = {}) {
     this.sockets = new Set();
     this.tasks = new Set();
     this.abortController = new AbortController();
@@ -18,6 +18,7 @@ class MediaEgress {
     this.error = '';
     this.output = null;
     this.proxy = proxy || null;   // { host, port } | null（HTTP CONNECT 代理）
+    this.onLog = onLog;
   }
 
   attach(socket) {
@@ -29,6 +30,14 @@ class MediaEgress {
 
   // 建立到 TikTok RTMP 服务器的连接（直连 / HTTP CONNECT / SOCKS5 代理隧道）
   _connectUpstream(hostname, port, protocol) {
+    this.onLog('连接上游 ' + hostname + ':' + port + '，出口=' + (this.proxy ? this.proxy.type + '://' + this.proxy.host + ':' + this.proxy.port : '直连'));
+    const ready = (sock) => {
+      if (/^rtmps/i.test(protocol)) {
+        const secure = tls.connect({ socket: sock, servername: hostname, rejectUnauthorized: false });
+        secure.once('error', error => sock.destroy(error));
+        secure.once('secureConnect', () => sock.emit('_egress_ready', secure));
+      } else sock.emit('_egress_ready', sock);
+    };
     const establish = () => {
       if (this.proxy && this.proxy.host && this.proxy.port) {
         if ((this.proxy.type || 'http') === 'socks5') {
@@ -40,24 +49,25 @@ class MediaEgress {
               buf = Buffer.concat([buf, c]);
               if (stage === 0 && buf.length >= 2) {
                 // 握手响应 [05, 00]=无认证
-                if (buf[1] !== 0x00) { sock.destroy(); return; }
+                if (buf[0] !== 0x05 || buf[1] !== 0x00) { sock.destroy(new Error('SOCKS5 认证协商失败，method=' + buf[1])); return; }
                 stage = 1; buf = Buffer.alloc(0);
                 const hn = Buffer.from(hostname, 'utf8');
-                if (hn.length > 255) { sock.destroy(); return; }
+                if (hn.length > 255) { sock.destroy(new Error('上游域名过长')); return; }
                 const req = Buffer.concat([
                   Buffer.from([0x05, 0x01, 0x00, 0x03, hn.length]), hn,
                   Buffer.from([(port >> 8) & 0xFF, port & 0xFF]),
                 ]);
                 sock.write(req);
-              } else if (stage === 1 && buf.length >= 10) {
-                sock.removeListener('data', onData);
+              } else if (stage === 1 && buf.length >= 4) {
                 const rep = buf[1];
-                if (rep !== 0x00) { sock.destroy(); return; }
-                let up = sock;
-                if (/^rtmps/i.test(protocol)) {
-                  up = tls.connect({ socket: sock, servername: hostname, rejectUnauthorized: false });
-                }
-                sock.emit('_egress_ready', up);
+                if (rep !== 0x00) { sock.destroy(new Error('SOCKS5 CONNECT 被拒绝，code=' + rep)); return; }
+                const replySize = buf[3] === 1 ? 10 : buf[3] === 4 ? 22 : buf[3] === 3 && buf.length >= 5 ? 7 + buf[4] : 0;
+                if (!replySize) { if (buf[3] === 3) return; sock.destroy(new Error('SOCKS5 返回地址类型无效')); return; }
+                if (buf.length < replySize) return;
+                sock.removeListener('data', onData);
+                sock.pause();
+                if (buf.length > replySize) sock.unshift(buf.subarray(replySize));
+                ready(sock);
               }
             };
             sock.on('data', onData);
@@ -85,13 +95,12 @@ class MediaEgress {
               const statusLine = buf.slice(0, buf.indexOf('\r\n'));
               if (/^HTTP\/1\.[01]\s+200/.test(statusLine)) {
                 // 隧道建立；若 rtmps 需要 TLS 包装
-                let up = sock;
-                if (/^rtmps/i.test(protocol)) {
-                  up = tls.connect({ socket: sock, servername: hostname, rejectUnauthorized: false });
-                }
-                sock.emit('_egress_ready', up);
+                sock.pause();
+                const rest = Buffer.from(buf.slice(idx + 4), 'latin1');
+                if (rest.length) sock.unshift(rest);
+                ready(sock);
               } else {
-                sock.destroy();
+                sock.destroy(new Error('HTTP CONNECT 被拒绝: ' + statusLine));
               }
             }
           };
@@ -112,11 +121,13 @@ class MediaEgress {
     return new Promise((resolve, reject) => {
       const sock = establish();
       let done = false;
-      sock.once('_egress_ready', (up) => { if (!done) { done = true; resolve(up); } });
-      sock.once('error', (e) => { if (!done) { done = true; reject(e); } });
-      sock.once('close', () => { if (!done) { done = true; reject(new Error('上游连接提前关闭')); } });
+      let timer;
+      const fail = (error) => { if (!done) { done = true; clearTimeout(timer); reject(error); } };
+      sock.once('_egress_ready', (up) => { if (!done) { done = true; clearTimeout(timer); this.onLog('上游连接已建立'); resolve(up); } });
+      sock.once('error', fail);
+      sock.once('close', () => fail(new Error('上游连接提前关闭')));
       // 12s 超时（照搬抖歪 tunnel 12000ms）
-      setTimeout(() => { if (!done) { done = true; reject(new Error('上游连接超时')); sock.destroy(); } }, 12000);
+      timer = setTimeout(() => { if (!done) { fail(new Error('上游连接超时')); sock.destroy(); } }, 12000);
     });
   }
 
@@ -158,15 +169,26 @@ class MediaEgress {
       this._connectUpstream(hostname, port, protocol).then((upstream) => {
         if (this.closed || this.abortController.signal.aborted) { sock.destroy(); try { upstream.destroy(); } catch (e) {} return; }
         this.attach(upstream);
+        let sent = 0, received = 0;
+        sock.on('data', chunk => { sent += chunk.length; });
+        upstream.on('data', chunk => { received += chunk.length; });
+        upstream.once('error', error => { this.error = error.message; this.onLog('上游错误: ' + error.message); });
+        upstream.once('close', () => {
+          const detail = '上游连接关闭，发送=' + sent + ' 字节，接收=' + received + ' 字节';
+          if (!this.closed && !this.error) this.error = detail;
+          this.onLog(detail);
+        });
         sock.on('close', () => upstream.destroy());
         sock.on('error', () => upstream.destroy());
         upstream.on('close', () => sock.destroy());
         upstream.on('error', () => sock.destroy());
         sock.pipe(upstream);
         upstream.pipe(sock);
+        upstream.resume();
         sock.resume();
       }).catch((e) => {
         this.error = e.message;
+        this.onLog('上游连接失败: ' + e.message);
         sock.destroy();
       });
     });
@@ -189,12 +211,13 @@ class MediaEgress {
     if (this.closed) return;
     this.closed = true;
     this.abortController.abort();
+    // 先断开活跃连接，server.close 才能完成退出。
+    for (const s of [...this.sockets]) { try { s.destroy(); } catch (e) {} }
+    this.sockets.clear();
     if (this.server) {
       await new Promise((resolve) => { try { this.server.close(() => resolve()); } catch (e) { resolve(); } });
       this.server = null;
     }
-    for (const s of [...this.sockets]) { try { s.destroy(); } catch (e) {} }
-    this.sockets.clear();
   }
 }
 

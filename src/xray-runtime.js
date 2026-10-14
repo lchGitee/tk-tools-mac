@@ -188,7 +188,7 @@ function reservePort() {
 }
 
 class XrayProcess {
-  constructor({ executable }) { this.executable = executable; this.child = null; this.cancelled = false; this.endpoint = null; this.exitTask = null; }
+  constructor({ executable, logDir }) { this.executable = executable; this.logDir = logDir || path.join(process.env.APPDATA || require('os').tmpdir(), 'TikTok直播工作台'); this.logPath = ''; this.child = null; this.cancelled = false; this.endpoint = null; this.exitTask = null; }
 
   async launch(configJson, testMode) {
     if (this.cancelled) throw new Error('节点启动已取消');
@@ -201,18 +201,19 @@ class XrayProcess {
     // 注意：createWriteStream 是异步打开（fd:null），spawn 不接受未就绪的 stream → 必须等 open 事件后再 spawn
     let stdioArr = ['ignore', 'ignore', 'ignore'];
     try {
-      const logDir = path.join(process.env.APPDATA || require('os').tmpdir(), 'TikTok直播工作台');
+      const logDir = this.logDir;
       fs.mkdirSync(logDir, { recursive: true });
-      const olds = fs.readdirSync(logDir).filter(f => /^xray_.*\.log$/.test(f));
-      olds.forEach(f => { try { fs.unlinkSync(path.join(logDir, f)); } catch (e) {} });
-      const xlog = fs.createWriteStream(path.join(logDir, 'xray_' + (testMode ? 'test_' : '') + Date.now() + '.log'), { flags: 'w' });
+      // 测速和常驻进程各留自己的日志，不删除仍被其他进程打开的文件。
+      this.logPath = path.join(logDir, 'xray_' + (testMode ? 'test_' : '') + Date.now() + '_' + crypto.randomBytes(4).toString('hex') + '.log');
+      const xlog = fs.createWriteStream(this.logPath, { flags: 'w' });
       await new Promise((res, rej) => { xlog.once('open', () => res()); xlog.once('error', (e) => rej(e)); });
       stdioArr = ['ignore', xlog, xlog];
-    } catch (e) {}
+      this.logStream = xlog;
+    } catch (e) { console.error('[内置代理] 日志文件创建失败:', e.message); }
     const child = spawn(this.executable, args, { windowsHide: true, stdio: stdioArr });
     setTimeout(() => { try { fs.unlinkSync(tmpPath); } catch (e) {} }, 8000);
     this.child = child;
-    const exitTask = new Promise(resolve => { child.once('error', () => resolve(-1)); child.once('close', code => resolve(code)); });
+    const exitTask = new Promise(resolve => { child.once('error', () => resolve(-1)); child.once('close', code => { if (this.logStream) this.logStream.end(); resolve(code); }); });
     this.exitTask = exitTask;
     return { child, exited: exitTask };
   }
@@ -254,7 +255,8 @@ class XrayProcess {
 
 // ---------- 运行时管理器（单节点：软件全局代理）----------
 class XrayRuntime {
-  constructor() {
+  constructor({ logDir } = {}) {
+    this.logDir = logDir;
     this.proc = null;
     this.port = DEFAULT_PORT;
     this.activeLink = '';
@@ -268,8 +270,13 @@ class XrayRuntime {
       const alt = await reservePort();
       this.port = alt;
     } else { this.port = DEFAULT_PORT; }
-    const proc = new XrayProcess({ executable: xrayPath });
-    proc.onExit = () => { if (this.proc === proc) this.proc = null; };
+    const proc = new XrayProcess({ executable: xrayPath, logDir: this.logDir });
+    proc.onExit = (code) => {
+      if (this.proc === proc) {
+        console.log('[内置代理] Xray 已退出 PID=' + proc.child.pid + ' code=' + code);
+        this.proc = null;
+      }
+    };
     const ep = await proc.startWithNode(nodeLink, this.port);
     this.proc = proc;
     this.activeLink = nodeLink;

@@ -23,7 +23,7 @@ async function sha256(file) {
 }
 async function main() {
   // 私有 Release 使用 gh 的本机登录，不把 GitHub Token 写入源码或命令参数。
-  run('gh', ['release', 'download', manifest.tag, '--repo', manifest.repository,
+  run('gh', ['release', 'download', manifest.tag,
     '--pattern', manifest.asset, '--dir', cache, '--clobber']);
   const zip = path.join(cache, manifest.asset);
   if (await sha256(zip) !== manifest.sha256) throw new Error('工具压缩包 SHA-256 不匹配，停止解压。');

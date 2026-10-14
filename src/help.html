@@ -26,19 +26,65 @@
   th { background:#16223a; color:#93c5fd; }
   td { color:#c3d0e5; }
   .tag { display:inline-block; background:#1d4ed8; color:#fff; border-radius:4px; padding:0 8px; font-size:12px; margin-right:6px; }
+
+/* ===== 说明书与工作台保持同一套配色，仅调整阅读样式 ===== */
+body { background: #f0f4f7; color: #18303e; max-width: 1040px; margin: 0 auto; padding: 48px 56px 80px; line-height: 1.85; }
+h1 { font-size: 30px; color: #153d4e; letter-spacing: -.6px; margin-bottom: 12px; }
+.sub { color: #627e8d; border-bottom-color: #d6e1e7; padding-bottom: 26px; margin-bottom: 32px; line-height: 1.8; }
+h2 { font-size: 21px; color: #076571; border-left: 4px solid #087f8c; padding-left: 14px; margin: 38px 0 18px; }
+h3 { font-size: 16px; color: #18303e; margin: 24px 0 12px; }
+p, li { font-size: 14px; color: #526c7b; margin-bottom: 10px; overflow-wrap: anywhere; }
+b { color: #254b5b; }
+ul, ol { padding-left: 26px; margin-bottom: 18px; }
+code { background: #e5eff3; border-color: #ccdde5; border-radius: 6px; color: #076571; padding: 2px 7px; overflow-wrap: anywhere; }
+.box, .step { background: #ffffff; border: 1px solid #d6e1e7; border-radius: 14px; padding: 18px 22px; margin: 14px 0; box-shadow: 0 2px 5px #14354506; }
+.step b { color: #076571; }
+.warn { background: #fff7e7; border-color: #ecd8ab; }
+.warn p, .warn b { color: #81591e; }
+.ok { background: #eaf7f1; border-color: #c3e7d8; }
+.ok p, .ok b { color: #1a634d; }
+table { background: #ffffff; margin: 20px 0; font-size: 13px; line-height: 1.75; }
+th, td { border-color: #d6e1e7; padding: 13px 16px; vertical-align: top; overflow-wrap: anywhere; }
+th { background: #e7f1f4; color: #254b5b; font-weight: 600; }
+td { color: #526c7b; }
+tr:nth-child(even) td { background: #f8fbfc; }
+.tag { background: #087f8c; border-radius: 6px; padding: 2px 9px; }
+::selection { background: #bee9e9; color: #123b47; }
+@media (max-width: 720px) {
+  body { padding: 28px 20px 56px; }
+  h1 { font-size: 25px; }
+  h2 { font-size: 19px; }
+  th, td { padding: 10px 8px; }
+  .box, .step { padding: 16px; }
+}
+
+/* 说明书采用本机字体，控制行长与段落节奏。 */
+body { font-family: 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', sans-serif; max-width: 960px; line-height: 1.9; }
+h1 { font-size: 28px; font-weight: 600; letter-spacing: -.2px; }
+h2 { font-size: 20px; font-weight: 600; margin-top: 36px; }
+h3 { font-weight: 600; }
+p, li { font-size: 13px; line-height: 1.9; }
+.sub { font-size: 12px; }
+.step { line-height: 1.9; font-size: 13px; }
+code { font-family: 'Cascadia Mono', 'Consolas', monospace; font-size: 12px; }
+table { font-size: 12px; }
+@media (max-width: 720px) {
+  body { padding-inline: 20px; }
+  h1 { font-size: 24px; }
+}
 </style>
 </head>
 <body>
 
 <h1>TikTok 直播工作台 · 使用说明书</h1>
-<div class="sub">v1.14.x 系列 ｜ 单端直播（手机开播 → 软件接管推流）｜ 绝对真实数据 ｜ 一卡一机授权</div>
+<div class="sub">单端直播（手机开播 → 软件接管推流）｜ 绝对真实数据 ｜ 一卡一机授权</div>
 
 <h2>一、软件简介</h2>
 <p>本软件是一款 TikTok 直播工具：<b>手机开播（Device camera）→ 软件实时抓取本场直播的当场推流码 → 手机断网/飞行 → 软件用当场新码推流（视频素材代替摄像头，GPU 编码）→ 观众看到的是软件画面 → 手动下播手机 → 单端直播达成</b>。</p>
 <div class="ok"><p>核心原则：<b>绝不绕过手机、绝不用旧推流码、绝不建假新房间</b>——每一场都用手机当场开播生成的新码。</p></div>
 
 <h2>二、快速开始（第一次使用）</h2>
-<div class="step"><b>① 激活软件</b>（v1.14.0 及以上）：打开软件 → 输入卡密（TK-XXXX-XXXX-XXXX）→ 点「激活」→ 自动绑定本机机器码。之后直接进。</div>
+<div class="step"><b>① 激活软件</b>：打开软件 → 将机器码发给签发方 → 粘贴本机专属授权码 → 点「激活」。之后直接进。</div>
 <div class="step"><b>② 添加账号</b>：主界面点「添加账号」→ 输入账号名 → 自动打开 TikTok 登录页 → 手机/账号登录 → 保存 Cookie。</div>
 <div class="step"><b>③ 添加节点</b>：点「代理设置 / 保存节点」→ 粘贴你的 vless:// 节点链接 → 保存 → 重启软件（内置 xray 自动起本地代理 10888）。</div>
 <div class="step"><b>④ 配置签名服务</b>（可选，推流帧签名用）：填入 RapidAPI 签名服务的 baseUrl / key / license_id。</div>
@@ -91,12 +137,12 @@
   <li>无节点时软件直连（推流本来需要可直连的网络环境，否则必须配节点）。</li>
 </ul>
 
-<h2>八、卡密授权（v1.14.0 及以上）</h2>
+<h2>八、卡密授权</h2>
 <ul>
   <li>打开软件先显示激活界面，输入有效卡密才能使用；</li>
-  <li>卡密永久有效、<b>一卡一机</b>：绑定第一台激活的电脑，复制软件到其他电脑无法使用（机器码不匹配）；</li>
-  <li>机器码 = CPU+主板+硬盘序列号哈希：<b>重装系统不变</b>；换主板/硬盘会变，需新卡密；</li>
-  <li>卡密以哈希存储、激活文件加密防篡改，软件内提取不到明文卡密。</li>
+  <li>授权永久有效、<b>绑定指定机器</b>：授权码只对签发时指定的机器码有效，其他电脑不能激活；</li>
+  <li>软件根据硬件信息生成机器码；更换硬件或机器码发生变化时，需要重新签发授权；</li>
+  <li>授权内容由签发方私钥签名，软件使用公钥验证签名，每次启动检查机器码是否匹配。</li>
 </ul>
 
 <h2>九、常见问题（FAQ）</h2>
@@ -108,8 +154,8 @@
   <tr><td>实时动态没数据</td><td>确认已开启监控且小电视窗口正常加载观众页；观众端有互动才会记录（点赞/进场/评论/礼物）。</td></tr>
   <tr><td>平台限流提示</td><td>多为推流素材被判定「非原创/复制内容」：软件会提示，消除限制需换素材策略（真人出镜等），必要时申诉。</td></tr>
   <tr><td>礼物数量不增加</td><td>礼物消息渲染在观众页特定层，软件已做全页兜底抓取；看运行日志「礼物线索」行定位。</td></tr>
-  <tr><td>下播后数据还在</td><td>旧版本问题；v1.13.x 起下播自动清零，开播重新记录。</td></tr>
-  <tr><td>打开直播间弹两个窗口</td><td>旧版本双触发问题；v1.13.x 起只开一个，重复点聚焦已开窗口。</td></tr>
+  <tr><td>下播后数据还在</td><td>下播自动清零，开播重新记录。</td></tr>
+  <tr><td>打开直播间弹两个窗口</td><td>只开一个，重复点聚焦已开窗口。</td></tr>
   <tr><td>多账号并发</td><td>每个账号独立推流隧道/端口/会话，可 4 账号并行（注意上行带宽：4×2500kbps≈10Mbps，建议上行 ≥15Mbps）。</td></tr>
 </table>
 
@@ -119,16 +165,7 @@
   <li>诊断文件（本机调试用，位于软件数据目录 AppData\Roaming\TikTok直播工作台\ 下）：_risk_alerts.txt（风险告警）、_poll_diag.txt（监控轮询）、_diag_chatitems.txt（互动明细）、_ffmpeg_stderr.txt（推流 FFmpeg 报错）。导出诊断包时自动附带最近记录。</li>
 </ul>
 
-<h2>十一、版本记录（简）</h2>
-<ul>
-  <li>v1.13.0-1.13.12：推流链路直连版（早于直连被墙）；</li>
-  <li>v1.13.14：SOCKS5 握手修复（代理隧道可推流）；</li>
-  <li>v1.13.15-1.13.23：实时动态四层根因修复（preload 注入 / 首次轮询 / 类型全局化 / 噪声清洗 / 节流）；</li>
-  <li>v1.13.24-1.13.27：限流检测 + 监控浮窗重开 + 自动互动收敛 + 疑似无流量；</li>
-  <li>v1.13.28-1.13.30：礼物全页兜底 + ×N 累加 + 限流外网 HTML 扫描；</li>
-  <li>v1.14.0：卡密授权系统（一卡一机、机器码绑定、激活文件加密）；</li>
-  <li>v1.14.1：内置说明书。</li>
-</ul>
+
 
 </body>
 </html>

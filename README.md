@@ -1,6 +1,6 @@
 # tk-tools
 
-TikTok 直播工作台 1.15.60 的 Windows 开发工程。界面、Electron 主进程、IPC 和客户端模块来自提供的安装包；保留原业务和卡密授权逻辑。
+TikTok 直播工作台 v1（1.0.2）的 Windows 开发工程。界面、Electron 主进程、IPC 和客户端模块来自提供的安装包；保留直播业务，授权改为绑定指定机器的离线数字签名。
 
 ## Windows 上开始开发
 
@@ -9,7 +9,7 @@ TikTok 直播工作台 1.15.60 的 Windows 开发工程。界面、Electron 主�
 ```powershell
 gh auth login
 gh auth setup-git
-git clone https://github.com/lchGitee/tk-tools.git
+git clone <你的私有仓库地址>
 cd tk-tools
 npm ci
 npm run setup:windows
@@ -45,13 +45,13 @@ scripts/
   restore-asar.py        可选的原包恢复工具，日常开发不需要
 ```
 
-`src/package.json` 保留原应用名称、版本和入口；根 `package.json` 管理开发命令和依赖，依赖通过 `package-lock.json` 固定。
+`src/package.json` 保留应用名称和入口，应用版本统一为首版 `1.0.0`；根 `package.json` 管理开发命令和依赖，依赖通过 `package-lock.json` 固定。
 
 ## 数据与授权
 
 开发运行使用仓库内 `.local/` 保存 Electron userData，包括账号、节点、会话和日志，激活文件也位于 `.local/activation.lic`。这些文件以及 `.env`、原安装包、提取目录、工具二进制和 node_modules 均不进入 Git。
 
-原卡密白名单和本地机器绑定逻辑保持原样。开发版仍需有效卡密；没有新增绕过授权的行为。
+客户端只使用公钥验证离线授权，旧卡密白名单和旧激活文件不再接受。每次启动均验证签名与当前机器码。
 
 ## 检查
 
@@ -63,7 +63,19 @@ npm run check
 
 Electron 版本按原 EXE 的运行时标识 28.3.3 固定；先建立行为基线，未在本次恢复中升级运行时。当前依赖存在 npm audit 报告的已知漏洞，更新依赖需要另外验证兼容性。
 
-当前提供开发运行工程；安装器和签名发布配置未恢复，不包含重新打包安装程序的命令。
+## 打包 Windows 安装程序
+
+先完成 `npm ci` 和 `npm run setup:windows`，然后执行：
+
+```powershell
+npm run build:win
+```
+
+安装程序输出到 `dist/tk-tools-Setup-1.0.2-x64.exe`，免安装运行目录为 `dist/win-unpacked`。原生工具放到 `app.asar.unpacked/src`，业务代码打包进 ASAR。安装包没有配置代码签名证书。应用图标位于 `src/assets/app-icon.png`，Windows 多尺寸图标位于 `build/app.ico`，打包时自动写入主程序、安装程序和卸载程序。
+
+打包脚本只生成本地产物，不自动发布。`.env`、开发账号数据和卡密明文不进入安装包。签名服务仍通过账号配置或进程环境变量提供凭据。
+
+授权码包含指定机器码和数字签名，不再使用 `LICENSE_HASHES`。旧的 `.local/new-license.txt` 只属于旧版，不能用于 1.0.2。
 
 ## 原始材料
 
@@ -74,3 +86,25 @@ Electron 版本按原 EXE 的运行时标识 28.3.3 固定；先建立行为基�
 ```
 
 运行组件来源与许可证说明见 `THIRD_PARTY_NOTICES.md`。
+
+## 离线授权签发（仅供你自己使用）
+
+这版已初始化一对 Ed25519 密钥。公钥位于 `src/license-public-key.pem`，随所有客户端分发；私钥位于 `.local/license-issuer/private-key.pem`，被 Git 忽略，也不会进入安装包。请单独备份私钥，换开发电脑时自行安全迁移，不能仅依赖 Git 克隆恢复。不能把私钥或签发工具连同私钥发给用户。
+
+新工程首次初始化才执行 `npm run license:init`。已有密钥时会拒绝覆盖；不要为每个用户重新生成密钥。
+
+每位用户都安装同一个 1.0.2 EXE，将激活页显示的 32 位机器码发给你。你运行：
+
+```powershell
+npm run license:issue -- --machine 用户的32位机器码
+```
+
+也可直接运行 `npm run license:issue`，按提示粘贴机器码。签发工具会显示授权码，并保存到 `.local/issued-licenses/机器码.txt`。把该文件中的整段 `TK1.…` 授权码发给用户，让用户粘贴到激活页。只需要机器码，不需要用户编号；当前均为永久授权，不管理到期或吊销。
+
+同一授权码只能在指定机器码上通过校验。换机或机器码改变需重新签发，完全离线不能让旧机器的授权立即失效。普通卡密、旧激活文件、签名被修改、其他设备机器码、其他私钥签发的授权均被拒绝。
+
+```powershell
+npm run test:license
+```
+
+授权测试覆盖指定机器激活、其他机器拒绝、重启、文件跨机器复制、篡改、错误密钥、旧格式和写入失败。Windows 真实硬件机器码稳定性及 GUI 激活仍需 Windows 验证。
