@@ -2,8 +2,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
-if (process.platform !== 'win32') {
-  console.error('本工程目前只支持 Windows 开发运行。');
+if (process.platform !== 'darwin' || process.arch !== 'arm64') {
+  console.error('本工程只支持 Apple Silicon macOS 开发运行。');
   process.exit(1);
 }
 const envFile = path.join(root, '.env');

@@ -26,7 +26,7 @@ const OBS_CANDIDATES = [
   'C:\\Program Files\\obs-studio\\bin\\64bit\\obs64.exe',
   'C:\\Program Files (x86)\\obs-studio\\bin\\64bit\\obs64.exe',
 ];
-const OBS_EXE = OBS_CANDIDATES.find(p => p && fs.existsSync(p)) || PORTABLE_OBS;
+const OBS_EXE = process.platform === 'darwin' ? require('./mac-platform').obsPath() : OBS_CANDIDATES.find(p => p && fs.existsSync(p)) || PORTABLE_OBS;
 // 默认场景媒体源名（与画面编辑器所选视频对应；找不到时自动创建）
 const SCENE_NAME = '直播场景';
 const SOURCE_NAME = '画面源';
@@ -34,6 +34,8 @@ const SOURCE_NAME = '画面源';
 // v1.13.0 内置 OBS 配置：走 %APPDATA% 标准配置（便携模式在 OBS 32.x 启动即崩，实测不用）
 // 已验证：内置 OBS 首次运行自动生成配置且 WebSocket(4455) 默认开启；此处仅兜底确保 config.json 存在
 function ensureOBSConfig() {
+  // Mac OBS 使用用户自己的 WebSocket 配置，不能覆盖已有配置。
+  if (process.platform === 'darwin') return;
   try {
     const wsCfgPath = path.join(process.env.APPDATA || '', 'obs-studio', 'plugin_config', 'obs-websocket', 'config.json');
     if (fs.existsSync(wsCfgPath)) return;
@@ -79,12 +81,13 @@ class OBSEngine {
         // 同时清理 OBS 崩溃痕迹（上次强杀/异常退出会弹"检测到崩溃"恢复框，阻塞 4455 就绪）
         try {
           const cp = process.env.APPDATA || '';
-          for (const d of [path.join(cp, 'obs-studio', 'logs'), path.join(cp, 'obs-studio', 'crash')]) {
+          for (const d of process.platform === 'darwin' ? [] : [path.join(cp, 'obs-studio', 'logs'), path.join(cp, 'obs-studio', 'crash')]) {
             if (!fs.existsSync(d)) continue;
             for (const f of fs.readdirSync(d)) { try { fs.unlinkSync(path.join(d, f)); } catch (e) {} }
           }
         } catch (e) {}
-        this.proc = spawn(OBS_EXE, ['--minimize-tray'], { detached: false, windowsHide: true, cwd: path.dirname(OBS_EXE) });
+        this.proc = spawn(OBS_EXE, process.platform === 'darwin' ? [] : ['--minimize-tray'], { detached: false, windowsHide: true, cwd: path.dirname(OBS_EXE) });
+        this.proc.on('error', () => resolve(false));
         const deadline = Date.now() + 25000;
         while (Date.now() < deadline) {
           await new Promise(r => setTimeout(r, 1500));
@@ -114,7 +117,7 @@ class OBSEngine {
           clearTimeout(timer);
           if (m.op === 0) { // Hello
             const authData = (m.d && m.d.authentication) || null;
-            const authentication = authData ? makeAuth(authData.challenge, authData.salt, '') : null;
+            const authentication = authData ? makeAuth(authData.challenge, authData.salt, process.platform === 'darwin' ? require('./mac-platform').obsPassword() : '') : null;
             try {
               ws.send(JSON.stringify({ op: 1, d: { rpcVersion: 1, authentication, eventSubscriptions: 0 } }));
             } catch (e) { this.ws = null; retry(); }
@@ -251,6 +254,8 @@ class OBSEngine {
 
   // v1.13.0 优雅关闭内置 OBS（Shutdown API）：干净退出 → 下次启动不弹崩溃恢复框
   async shutdown() {
+    // Mac 接入用户安装的 OBS，仅断开连接，避免关闭用户正在使用的应用。
+    if (process.platform === 'darwin') { if (this.ws) this.ws.close(); return true; }
     if (!this.ws || !this._ready) return false;
     try { const r = await this.call('Shutdown'); return !!(r && r.requestStatus && r.requestStatus.result); } catch (e) { return false; }
   }

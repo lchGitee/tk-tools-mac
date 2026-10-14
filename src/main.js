@@ -4,6 +4,7 @@ const { app, BrowserWindow, ipcMain, dialog, session, screen, net: electronNet, 
 const path = require('path');
 const { spawn, execSync } = require('child_process');
 const crypto = require('crypto'); // v1.14.0 卡密授权：机器码哈希 / lic 加密
+const macPlatform = require('./mac-platform');
 const os = require('os'); // v1.14.0 机器码 fallback
 const fs = require('fs');
 // 开发数据独立存放，避免覆盖正式安装版的账号与节点配置。
@@ -49,6 +50,7 @@ const licensePublicKey = crypto.createPublicKey(fs.readFileSync(path.join(__dirn
 let _machineCache = '';
 function getMachineCode() {
   if (_machineCache) return _machineCache;
+  if (process.platform === 'darwin') return (_machineCache = macPlatform.getMachineCode());
   let raw = '';
   try {
     const cpu = execSync('wmic cpu get ProcessorId /value', { timeout: 6000, windowsHide: true }).toString().match(/ProcessorId=(\S+)/i);
@@ -75,7 +77,7 @@ function getMachineCode() {
   return _machineCache;
 }
 function licPath() {
-  return path.join(app.isPackaged ? path.dirname(app.getPath('exe')) : app.getPath('userData'), 'activation.lic');
+  return path.join(process.platform === 'darwin' || !app.isPackaged ? app.getPath('userData') : path.dirname(app.getPath('exe')), 'activation.lic');
 }
 const licenseStore = createLicenseStore({ filePath: licPath(), getMachineCode, publicKey: licensePublicKey });
 function licenseState() { return licenseStore.state(); }
@@ -262,7 +264,7 @@ ipcMain.handle('diagnostics:export', async () => {
     lines.push('用户数据: ' + app.getPath('userData'));
     lines.push('应用 PID: ' + process.pid + ' / 工作目录: ' + process.cwd());
     lines.push('Xray PID: ' + (xrayRuntime && xrayRuntime.proc && xrayRuntime.proc.child ? xrayRuntime.proc.child.pid : '未运行'));
-    lines.push('Xray 文件: ' + unpackedPath(path.join(__dirname, 'xray-portable', 'xray.exe')));
+    lines.push('Xray 文件: ' + (process.platform === 'darwin' ? macPlatform.runtimePath('xray') : unpackedPath(path.join(__dirname, 'xray-portable', 'xray.exe'))));
     lines.push('');
     lines.push('--- 代理状态 ---');
     lines.push('全局代理: ' + (_proxyServer || '未设置(直连)'));
@@ -286,7 +288,7 @@ ipcMain.handle('diagnostics:export', async () => {
     lines.push('');
     lines.push('--- FFmpeg 内置引擎检测 ---');
     (function ffDiag() {
-      const cands = [
+      const cands = process.platform === 'darwin' ? [macPlatform.runtimePath('ffmpeg')] : [
         path.join(process.resourcesPath, 'app', 'ffmpeg', 'bin', 'ffmpeg.exe'),
         path.join(process.resourcesPath, 'app.asar.unpacked', 'ffmpeg', 'bin', 'ffmpeg.exe'),
         path.join(__dirname, 'ffmpeg', 'bin', 'ffmpeg.exe'),
@@ -1828,7 +1830,7 @@ ipcMain.handle('node:test', async (event, { url }) => {
   if (!base || !base.success) return base || { success: false, error: '节点不可达' };
   // v1.14.7 连通通过后：起独立 xray 实测下行/上行（不打断当前运行节点）
   try {
-    const proc = new XrayProcess({ executable: unpackedPath(path.join(__dirname, 'xray-portable', 'xray.exe')), logDir: app.getPath('userData') });
+    const proc = new XrayProcess({ executable: (process.platform === 'darwin' ? macPlatform.runtimePath('xray') : unpackedPath(path.join(__dirname, 'xray-portable', 'xray.exe'))), logDir: app.getPath('userData') });
     const ep = await proc.startWithNode(u, await reserveTestPort());
     const sp = await nodeSpeedTest(ep.port);
     await proc.stop().catch(() => {});
@@ -1929,6 +1931,7 @@ function proxyNodeProbe(url) {
 // v1.14.7 内置 curl：实时动态 im/fetch 的 curl fallback 原依赖系统 curl.exe（Windows 10 1803+ 自带），
 // 精简版系统可能缺失 → 把 curl.exe（0.5MB，微软签名）内置到软件 curl\bin，优先内置，找不到再退回系统 PATH。
 function findCurl() {
+  if (process.platform === 'darwin') return '/usr/bin/curl';
   const cands = [
     path.join(process.resourcesPath, 'app', 'curl', 'bin', 'curl.exe'),
     path.join(process.resourcesPath, 'app.asar.unpacked', 'curl', 'bin', 'curl.exe'),
@@ -1947,6 +1950,10 @@ function findCurl() {
 // 新电脑 PATH 无 ffmpeg 时 spawn 报 ENOENT（-4058）——即使内置 ffmpeg.exe 就躺在软件目录里也没被用上。
 // 现在：按真实路径逐候选 existsSync 验证（内置三处部署路径 + 常见安装位置），全部落空才退回 PATH 裸命令（且 spawnSync 真验证）。
 function findFFmpeg() {
+  if (process.platform === 'darwin') {
+    const file = macPlatform.runtimePath('ffmpeg');
+    return fs.existsSync(file) ? file : null;
+  }
   const candidates = [
     path.join(process.resourcesPath, 'app', 'ffmpeg', 'bin', 'ffmpeg.exe'),
     path.join(process.resourcesPath, 'app.asar.unpacked', 'ffmpeg', 'bin', 'ffmpeg.exe'),
@@ -2036,12 +2043,16 @@ ipcMain.handle('ffmpeg:check', async () => {
 });
 
 // 探测 Windows 音频输入设备（dshow），存在则推流带麦克风声音，否则用静音轨保证推流稳定
-function detectAudioDevice(timeoutMs) {
+async function detectAudioDevice(timeoutMs) {
+  if (process.platform === 'darwin') {
+    const { systemPreferences } = require('electron');
+    if (!await systemPreferences.askForMediaAccess('microphone')) return null;
+  }
   return new Promise((resolve) => {
     const ffmpegPath = findFFmpeg();
     if (!ffmpegPath) return resolve(null);
     try {
-      const probe = spawn(ffmpegPath, ['-hide_banner', '-f', 'dshow', '-list_devices', 'true', '-i', 'dummy'], { stdio: ['ignore', 'pipe', 'pipe'] });
+      const probe = spawn(ffmpegPath, ['-hide_banner', '-f', process.platform === 'darwin' ? 'avfoundation' : 'dshow', '-list_devices', 'true', '-i', process.platform === 'darwin' ? '' : 'dummy'], { stdio: ['ignore', 'pipe', 'pipe'] });
       let out = '';
       probe.stdout.on('data', d => out += d.toString());
       probe.stderr.on('data', d => out += d.toString());
@@ -2049,6 +2060,7 @@ function detectAudioDevice(timeoutMs) {
       probe.on('close', () => {
         clearTimeout(timer);
         // v1.9.10 只接受正常的设备名（字母数字空格-），空名/含换行的无效设备一律视为无设备（走静音轨兜底，不再崩溃）
+        if (process.platform === 'darwin') return resolve(macPlatform.audioDevice(out));
         const m = out.match(/"([^"]+)"[^\n]*\(audio\)/i);
         let name = (m ? m[1] : '').replace(/\r?\n/g, '').trim();
         if (name && !/^[a-zA-Z0-9_ ()（）\-\u4e00-\u9fa5]+$/.test(name)) name = '';
@@ -2257,7 +2269,7 @@ async function startStreamNow(accountId, payload) {
   } else {
     // 无视频音轨：麦克风或静音轨兜底
     const audioInputs = useMic
-      ? ['-f', 'dshow', '-i', 'audio=' + audioDevice]
+      ? (process.platform === 'darwin' ? ['-f', 'avfoundation', '-i', ':' + audioDevice] : ['-f', 'dshow', '-i', 'audio=' + audioDevice])
       : ['-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100'];
     args = ['-y', '-f', 'image2pipe', '-framerate', '15', '-i', '-', ...audioInputs, '-map', '0:v', '-map', '1:a'];
     console.log('[推流] 音频输入:', useMic ? ('麦克风 ' + audioDevice) : '静音轨（未探测到音频设备）');

@@ -1,8 +1,8 @@
 {
-  "name": "tk-tools",
+  "name": "tk-tools-mac",
   "version": "1.0.2",
   "private": true,
-  "description": "TikTok 直播工作台 Windows 开发工程",
+  "description": "TikTok 直播工作台 Apple Silicon macOS 开发工程",
   "main": "src/main.js",
   "engines": {
     "node": ">=22.19.0"
@@ -10,13 +10,14 @@
   "scripts": {
     "start": "node scripts/start.cjs",
     "dev": "node scripts/start.cjs --dev",
-    "setup:windows": "node scripts/setup-windows.cjs",
     "check": "node scripts/check.cjs",
-    "build:win": "node scripts/build-windows.cjs",
     "license:init": "node scripts/license-issuer.cjs --init",
     "license:issue": "node scripts/license-issuer.cjs",
     "test:license": "node --test tests/license.test.cjs",
-    "test:network": "node --test tests/network.test.cjs"
+    "test:network": "node --test tests/network.test.cjs",
+    "setup:mac": "node scripts/setup-mac.cjs",
+    "build:mac": "node scripts/build-mac.cjs",
+    "test:mac": "node --test tests/mac.test.cjs"
   },
   "dependencies": {
     "fluent-ffmpeg": "2.1.3",

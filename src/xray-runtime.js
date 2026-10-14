@@ -263,8 +263,8 @@ class XrayRuntime {
   }
   async start(nodeLink) {
     await this.stop();
-    const xrayPath = unpackedPath(path.join(__dirname, 'xray-portable', 'xray.exe'));
-    if (!fs.existsSync(xrayPath)) throw new Error('内置 xray 内核缺失（xray-portable/xray.exe）');
+    const xrayPath = process.platform === 'darwin' ? require('./mac-platform').runtimePath('xray') : unpackedPath(path.join(__dirname, 'xray-portable', 'xray.exe'));
+    if (!fs.existsSync(xrayPath)) throw new Error('内置 Xray 内核缺失，请准备当前平台运行工具');
     // 10888 被占用 → 探测一个空闲端口（尽量贴近）
     if (!await isPortFree(this.port)) {
       const alt = await reservePort();

@@ -1888,9 +1888,9 @@ function renderAccountCard(acc) {
           <button class="btn ${(acc.streaming || acc.connecting) ? 'btn-danger' : 'btn-success'} btn-main" onclick="toggleStream(${acc.id})">
             ${acc.starting ? '正在启动推流…' : (acc.streaming ? '停止推流' : (acc.connecting ? '连接中…(点击取消)' : (acc.retrying ? '推流重试中…(点击取消)' : '开始内置推流')))}
           </button>
-          <select class="engine-select" onchange="setStreamEngine(${acc.id}, this.value)" title="推流引擎：FFmpeg=内置直推(已验证，推荐)；OBS=内置便携OBS(多素材/滤镜合成，隐藏运行)">
+          <select class="engine-select" onchange="setStreamEngine(${acc.id}, this.value)" title="推流引擎：FFmpeg=内置直推(已验证，推荐)；OBS=本机安装的Mac OBS(多素材/滤镜合成)">
             <option value="ffmpeg" ${!acc.useOBS ? 'selected' : ''}>引擎:FFmpeg</option>
-            <option value="obs" ${acc.useOBS ? 'selected' : ''}>引擎:OBS(内置)</option>
+            <option value="obs" ${acc.useOBS ? 'selected' : ''}>引擎:OBS(本机)</option>
           </select>
         </div>
         <!-- v1.13.0 第二行：功能按钮分组（账号/画面/推流/窗口）；v1.13.4 按钮均分填满消除尾部空白 -->
@@ -3261,8 +3261,8 @@ function setStreamEngine(id, v) {
   acc.useOBS = (v === 'obs');
   saveState();
   render();
-  addLog('账号 ' + acc.name + ' 推流引擎: ' + (acc.useOBS ? 'OBS(内置便携,隐藏运行)' : 'FFmpeg(内置直推)'));
-  showToast(acc.useOBS ? '已切换到 OBS 引擎（内置便携，隐藏运行；需选视频素材）' : '已切换到 FFmpeg 引擎（内置直推）', 'info');
+  addLog('账号 ' + acc.name + ' 推流引擎: ' + (acc.useOBS ? 'OBS(本机)' : 'FFmpeg(内置直推)'));
+  showToast(acc.useOBS ? '已切换到 OBS 引擎（需安装 Mac OBS 并开启 WebSocket；需选视频素材）' : '已切换到 FFmpeg 引擎（内置直推）', 'info');
 }
 
 // v1.12.52 选择推流视频素材（手机流接管时观众看到此视频；同步加入画面编辑器图层互通）

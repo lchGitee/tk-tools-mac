@@ -1,43 +1,55 @@
 {
-  "appId": "app.tktools.desktop",
-  "productName": "tk-tools",
+  "appId": "app.tktools.mac",
+  "productName": "tk-tools-mac",
   "electronVersion": "28.3.3",
   "directories": {
     "output": "dist"
   },
   "files": [
     "src/**/*",
+    "!src/ffmpeg/**/*",
+    "!src/obs-portable/**/*",
+    "!src/xray-portable/**/*",
+    "!src/curl/**/*",
     "package.json"
   ],
   "asar": true,
-  "asarUnpack": [
-    "src/ffmpeg/**/*",
-    "src/obs-portable/**/*",
-    "src/xray-portable/**/*",
-    "src/curl/**/*"
-  ],
   "npmRebuild": false,
-  "win": {
+  "copyright": "",
+  "extraResources": [
+    {
+      "from": ".runtime-mac",
+      "to": "mac-runtime"
+    }
+  ],
+  "mac": {
     "target": [
       {
-        "target": "nsis",
+        "target": "dmg",
         "arch": [
-          "x64"
+          "arm64"
+        ]
+      },
+      {
+        "target": "zip",
+        "arch": [
+          "arm64"
         ]
       }
     ],
-    "icon": "build/app.ico",
-    "signExecutable": false,
-    "artifactName": "tk-tools-Setup-${version}-x64.exe"
-  },
-  "nsis": {
-    "installerIcon": "build/app.ico",
-    "uninstallerIcon": "build/app.ico",
-    "oneClick": false,
-    "perMachine": false,
-    "allowToChangeInstallationDirectory": true,
-    "createDesktopShortcut": true,
-    "createStartMenuShortcut": true
-  },
-  "copyright": ""
+    "category": "public.app-category.utilities",
+    "icon": "src/assets/app-icon.png",
+    "hardenedRuntime": true,
+    "entitlements": "build/entitlements.mac.plist",
+    "entitlementsInherit": "build/entitlements.mac.plist",
+    "extendInfo": {
+      "NSMicrophoneUsageDescription": "用于直播推流的麦克风音频采集"
+    },
+    "artifactName": "tk-tools-mac-${version}-arm64.${ext}",
+    "minimumSystemVersion": "15.0",
+    "binaries": [
+      "Contents/Resources/mac-runtime/bin/ffmpeg",
+      "Contents/Resources/mac-runtime/bin/xray"
+    ]
+  }
 }
